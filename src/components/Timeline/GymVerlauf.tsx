@@ -94,7 +94,7 @@ export function GymVerlauf({ onBack }: Props) {
                 <Tooltip
                   contentStyle={{ background: '#0d0d0d', border: '0.5px solid #252525', borderRadius: 8, fontSize: 10, color: '#888' }}
                   labelStyle={{ color: '#c8c8c8' }}
-                  formatter={(v: number) => [`${v} kg Vol.`, '']}
+                  formatter={(v) => [`${v ?? 0} kg Vol.`, '']}
                 />
                 <Area type="monotone" dataKey="volume" stroke="#888" strokeWidth={1.5}
                   fill="url(#gymGrad)" dot={false} activeDot={{ r: 4, fill: '#c8c8c8' }} />

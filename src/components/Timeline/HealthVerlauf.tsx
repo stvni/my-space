@@ -114,7 +114,7 @@ export function HealthVerlauf({ onBack }: Props) {
                     domain={['dataMin - 1', 'dataMax + 1']} />
                   <Tooltip
                     contentStyle={{ background: '#0d0d0d', border: '0.5px solid #252525', borderRadius: 8, fontSize: 11, color: '#c8c8c8' }}
-                    formatter={(v: number) => [`${v} kg`, 'Gewicht']}
+                    formatter={(v) => [`${v ?? 0} kg`, 'Gewicht']}
                   />
                   <ReferenceLine y={weightGoal} stroke="#4ade80" strokeDasharray="4 4" strokeWidth={0.5}
                     label={{ value: 'Ziel', fill: '#4ade80', fontSize: 9 }} />
@@ -154,7 +154,7 @@ export function HealthVerlauf({ onBack }: Props) {
                   <ReferenceLine y={sleepGoal} stroke="#252525" strokeDasharray="3 3" />
                   <Tooltip
                     contentStyle={{ background: '#0d0d0d', border: '0.5px solid #252525', borderRadius: 8, fontSize: 10 }}
-                    formatter={(v: number) => [`${v}h`, 'Schlaf']}
+                    formatter={(v) => [`${v ?? 0}h`, 'Schlaf']}
                   />
                   <Bar dataKey="sleep" radius={[3, 3, 0, 0]}>
                     {sleepData.map((d, i) => (
@@ -178,7 +178,7 @@ export function HealthVerlauf({ onBack }: Props) {
                   <ReferenceLine y={waterGoal} stroke="#252525" strokeDasharray="3 3" />
                   <Tooltip
                     contentStyle={{ background: '#0d0d0d', border: '0.5px solid #252525', borderRadius: 8, fontSize: 10 }}
-                    formatter={(v: number) => [`${v} Gläser`, 'Wasser']}
+                    formatter={(v) => [`${v ?? 0} Gläser`, 'Wasser']}
                   />
                   <Bar dataKey="water" radius={[3, 3, 0, 0]}>
                     {waterData.map((d, i) => (

@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, X, Dumbbell, ChevronDown, ChevronUp, Trash2, History, Pencil, Check, BookOpen, ImageOff, Moon, Zap } from 'lucide-react'
+import { Plus, X, Dumbbell, Trash2, History, Pencil, Check, BookOpen, ImageOff, Moon, Zap } from 'lucide-react'
 import {
   db, type GymPlanDay, type GymPlanSection, type Exercise,
   type WorkoutExercise, getTodayDay, getTodayPlanIndex, seedExerciseLibrary,

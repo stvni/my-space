@@ -267,7 +267,7 @@ export function Skincare() {
                         <Tooltip
                           contentStyle={{ background: '#0d0d0d', border: '0.5px solid #252525', borderRadius: 8, fontSize: 10 }}
                           labelStyle={{ color: '#c8c8c8' }}
-                          formatter={(v: number, name: string) => [`${v}%`, name === 'morningPct' ? 'Morgens' : 'Abends']}
+                          formatter={(v, name) => [`${v ?? 0}%`, String(name) === 'morningPct' ? 'Morgens' : 'Abends']}
                         />
                         <Bar dataKey="morningPct" fill="rgba(200,200,200,0.5)" radius={[3, 3, 0, 0]} />
                         <Bar dataKey="eveningPct" fill="rgba(120,120,120,0.3)" radius={[3, 3, 0, 0]} />
