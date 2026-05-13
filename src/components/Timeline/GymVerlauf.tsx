@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { ArrowLeft } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
-  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
 } from 'recharts'
 import { db } from '../../db/db'
 
@@ -48,10 +48,9 @@ export function GymVerlauf({ onBack }: Props) {
       total: s.exercises.length,
     }))
 
-  const maxVolume = chartData.length > 0 ? Math.max(...chartData.map(d => d.volume)) : 0
-  const avgVolume = chartData.length > 0
-    ? Math.round(chartData.reduce((s, d) => s + d.volume, 0) / chartData.length)
-    : 0
+  const maxVolume  = chartData.length > 0 ? Math.max(...chartData.map(d => d.volume)) : 0
+  const avgVolume  = chartData.length > 0 ? Math.round(chartData.reduce((s, d) => s + d.volume, 0) / chartData.length) : 0
+  const completionData = chartData.map(d => ({ date: d.date, pct: d.total > 0 ? Math.round((d.done / d.total) * 100) : 0 }))
 
   return (
     <div>
@@ -81,41 +80,64 @@ export function GymVerlauf({ onBack }: Props) {
             <div style={{ fontSize: 9, color: '#333', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>
               Volumen pro Session
             </div>
-            <ResponsiveContainer width="100%" height={180}>
-              <AreaChart data={chartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+            <ResponsiveContainer width="100%" height={200}>
+              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="gymGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#888888" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#888888" stopOpacity={0} />
+                    <stop offset="0%"   stopColor="#22c55e" stopOpacity={0.25} />
+                    <stop offset="100%" stopColor="#22c55e" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="date" tick={{ fill: '#333', fontSize: 9 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#333', fontSize: 9 }} axisLine={false} tickLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" vertical={false} />
+                <XAxis dataKey="date" tick={{ fill: '#444', fontSize: 9 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#555', fontSize: 10 }} axisLine={false} tickLine={false}
+                  tickFormatter={v => `${v}kg`} />
                 <Tooltip
-                  contentStyle={{ background: '#0d0d0d', border: '0.5px solid #252525', borderRadius: 8, fontSize: 10, color: '#888' }}
-                  labelStyle={{ color: '#c8c8c8' }}
-                  formatter={(v) => [`${v ?? 0} kg Vol.`, '']}
+                  contentStyle={{ background: '#0d0d0d', border: '0.5px solid #252525', borderRadius: 8, fontSize: 11, color: '#c8c8c8', boxShadow: 'none' }}
+                  labelStyle={{ color: '#888', fontSize: 10 }}
+                  cursor={{ stroke: '#2a2a2a', strokeWidth: 1 }}
+                  formatter={(v) => [`${v ?? 0} kg`, 'Volumen']}
                 />
-                <Area type="monotone" dataKey="volume" stroke="#888" strokeWidth={1.5}
-                  fill="url(#gymGrad)" dot={false} activeDot={{ r: 4, fill: '#c8c8c8' }} />
+                <Area type="monotone" dataKey="volume" stroke="#22c55e" strokeWidth={1.5}
+                  fill="url(#gymGrad)"
+                  dot={{ r: 2.5, fill: '#888', strokeWidth: 0 }}
+                  activeDot={{ r: 5, fill: '#22c55e', strokeWidth: 0 }} />
               </AreaChart>
             </ResponsiveContainer>
 
             {/* Stats row */}
-            <div style={{ display: 'flex', gap: 24, padding: '8px 0', borderBottom: '0.5px solid #1a1a1a' }}>
-              <div>
-                <div style={{ fontSize: 9, color: '#333', letterSpacing: '0.1em', textTransform: 'uppercase' }}>BEST SESSION</div>
-                <div style={{ fontSize: 13, color: '#c8c8c8', fontWeight: 500, marginTop: 2 }}>{maxVolume} kg</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 9, color: '#333', letterSpacing: '0.1em', textTransform: 'uppercase' }}>SESSIONS</div>
-                <div style={{ fontSize: 13, color: '#c8c8c8', fontWeight: 500, marginTop: 2 }}>{sessions.length}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 9, color: '#333', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Ø VOLUME</div>
-                <div style={{ fontSize: 13, color: '#c8c8c8', fontWeight: 500, marginTop: 2 }}>{avgVolume} kg</div>
-              </div>
+            <div style={{ display: 'flex', gap: 20, padding: '10px 0 16px', borderBottom: '0.5px solid #1a1a1a' }}>
+              {[
+                { label: 'Best Session', value: maxVolume > 0 ? `${maxVolume} kg` : '—' },
+                { label: 'Sessions',     value: String(sessions.length) },
+                { label: 'Ø Volumen',    value: avgVolume > 0 ? `${avgVolume} kg` : '—' },
+              ].map(({ label, value }) => (
+                <div key={label}>
+                  <div style={{ fontSize: 8, color: '#333', letterSpacing: '0.12em', textTransform: 'uppercase' }}>{label}</div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: '#c8c8c8', marginTop: 2 }}>{value}</div>
+                </div>
+              ))}
             </div>
+
+            {/* Completion % bar chart */}
+            <div style={{ fontSize: 9, color: '#333', letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: 20, marginBottom: 6 }}>Completion %</div>
+            <ResponsiveContainer width="100%" height={100}>
+              <BarChart data={completionData} barSize={8} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" vertical={false} />
+                <XAxis dataKey="date" tick={{ fill: '#444', fontSize: 8 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#555', fontSize: 9 }} axisLine={false} tickLine={false} domain={[0, 100]} tickFormatter={v => `${v}%`} />
+                <Tooltip
+                  contentStyle={{ background: '#0d0d0d', border: '0.5px solid #252525', borderRadius: 8, fontSize: 11, color: '#c8c8c8', boxShadow: 'none' }}
+                  labelStyle={{ color: '#888', fontSize: 10 }}
+                  formatter={(v) => [`${v}%`, 'Completion']}
+                />
+                <Bar dataKey="pct" radius={[3, 3, 0, 0]}>
+                  {completionData.map((d, i) => (
+                    <Cell key={i} fill={d.pct >= 80 ? 'rgba(34,197,94,0.4)' : d.pct >= 50 ? 'rgba(234,179,8,0.3)' : 'rgba(107,114,128,0.2)'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
 
           {/* ── Timeline ── */}

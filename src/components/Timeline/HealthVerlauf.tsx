@@ -3,13 +3,19 @@ import { ArrowLeft } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, ReferenceLine, Cell,
+  ResponsiveContainer, ReferenceLine, Cell, CartesianGrid,
 } from 'recharts'
 import { db, type HealthMetric } from '../../db/db'
 
 interface Props { onBack: () => void }
 
-function formatShort(dateStr: string) {
+const TT = {
+  contentStyle: { background: '#0d0d0d', border: '0.5px solid #252525', borderRadius: 8, fontSize: 11, color: '#c8c8c8', boxShadow: 'none' },
+  labelStyle: { color: '#888', fontSize: 10 },
+  cursor: { stroke: '#2a2a2a', strokeWidth: 1 },
+}
+
+function fmt(dateStr: string) {
   const d = new Date(dateStr)
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`
 }
@@ -21,144 +27,123 @@ function getLast30(): string[] {
   })
 }
 
-function dayName(dateStr: string) {
-  return ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][new Date(dateStr).getDay()]
+function dayName(ds: string) {
+  return ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][new Date(ds).getDay()]
 }
 
-function formatDate(dateStr: string) {
-  const d = new Date(dateStr)
-  const months = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']
-  return `${d.getDate()}. ${months[d.getMonth()]}`
+function formatDate(ds: string) {
+  const d = new Date(ds)
+  return `${d.getDate()}. ${ ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'][d.getMonth()]}`
 }
 
 function weightTrend(metrics: HealthMetric[], date: string) {
   const sorted = [...metrics].sort((a, b) => a.date.localeCompare(b.date))
   const idx = sorted.findIndex(m => m.date === date)
   if (idx <= 0) return null
-  const prev = sorted[idx - 1]
-  const curr = sorted[idx]
-  if (!prev.weight || !curr.weight) return null
-  const diff = curr.weight - prev.weight
+  const diff = (sorted[idx].weight ?? 0) - (sorted[idx - 1].weight ?? 0)
   if (Math.abs(diff) < 0.05) return null
   return diff > 0 ? '↑' : '↓'
+}
+
+function StatCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div style={{ fontSize: 8, color: '#333', letterSpacing: '0.12em', textTransform: 'uppercase' }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 500, color: '#c8c8c8', marginTop: 2 }}>{value}</div>
+    </div>
+  )
 }
 
 export function HealthVerlauf({ onBack }: Props) {
   const allMetrics = useLiveQuery(() => db.healthMetrics.orderBy('date').toArray(), []) ?? []
   const savedGoals = useLiveQuery(() => db.healthGoals.get(1), [])
-  const weightGoal = savedGoals?.weight ?? 70
-  const sleepGoal = savedGoals?.sleep ?? 8
-  const waterGoal = savedGoals?.water ?? 8
+  const weightGoal = savedGoals?.weight ?? 72
+  const sleepGoal  = savedGoals?.sleep  ?? 8
+  const waterGoal  = savedGoals?.water  ?? 3.0
 
   const days = getLast30()
   const metricMap = new Map(allMetrics.map(m => [m.date, m]))
   const hasAny = allMetrics.length > 0
 
-  // Weight chart data — all entries with weight, ascending
   const weightData = allMetrics
     .filter(m => (m.weight ?? 0) > 0)
-    .map(m => ({ date: formatShort(m.date), weight: m.weight! }))
+    .map(m => ({ date: fmt(m.date), weight: m.weight! }))
 
-  // Last 14 entries for sleep + water bar charts
   const recent14 = allMetrics.slice(-14)
-  const sleepData = recent14
-    .filter(m => m.sleep != null)
-    .map(m => ({ date: formatShort(m.date), sleep: m.sleep! }))
-  const waterData = recent14
-    .filter(m => m.water != null)
-    .map(m => ({ date: formatShort(m.date), water: m.water! }))
+  const sleepData = recent14.filter(m => m.sleep != null).map(m => ({ date: fmt(m.date), sleep: m.sleep! }))
+  const waterData = recent14.filter(m => m.water != null).map(m => ({ date: fmt(m.date), water: m.water! }))
 
   const first = weightData[0]?.weight
-  const last = weightData[weightData.length - 1]?.weight
-  const diff = weightData.length > 1 ? (last - first).toFixed(1) : null
+  const last  = weightData[weightData.length - 1]?.weight
+  const trend = weightData.length > 1 ? (last - first) : null
 
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <motion.button
-          whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.97 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          onClick={onBack}
+        <motion.button whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.97 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }} onClick={onBack}
           style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'transparent',
             border: '0.5px solid #252525', borderRadius: 7, padding: '6px 12px',
             color: '#888', fontSize: 11, cursor: 'pointer', letterSpacing: '0.06em' }}>
           <ArrowLeft size={12} /> Zurück
         </motion.button>
-        <span style={{ fontSize: 10, color: '#333', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-          Health · Verlauf
-        </span>
+        <span style={{ fontSize: 10, color: '#333', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Health · Verlauf</span>
       </div>
 
       {!hasAny ? (
-        <div style={{ textAlign: 'center', padding: '60px 0', color: '#333', fontSize: 13 }}>
-          Noch keine Daten. Starte heute mit dem Tracking.
-        </div>
+        <div style={{ textAlign: 'center', padding: '60px 0', color: '#333', fontSize: 13 }}>Noch keine Daten.</div>
       ) : (
         <>
-          {/* ── Weight chart (prominent) ── */}
+          {/* Weight chart */}
           {weightData.length > 0 && (
             <div style={{ marginBottom: 28 }}>
-              <div style={{ fontSize: 9, color: '#333', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>
-                Gewichtsverlauf
-              </div>
-              <ResponsiveContainer width="100%" height={220}>
-                <AreaChart data={weightData} margin={{ top: 10, right: 0, left: -10, bottom: 0 }}>
+              <div style={{ fontSize: 9, color: '#333', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>Gewichtsverlauf</div>
+              <ResponsiveContainer width="100%" height={240}>
+                <AreaChart data={weightData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
-                    <linearGradient id="weightGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#c8c8c8" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#c8c8c8" stopOpacity={0} />
+                    <linearGradient id="wGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%"   stopColor="#c8c8c8" stopOpacity={0.25} />
+                      <stop offset="100%" stopColor="#c8c8c8" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="date" tick={{ fill: '#333', fontSize: 9 }} axisLine={false} tickLine={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" vertical={false} />
+                  <XAxis dataKey="date" tick={{ fill: '#444', fontSize: 9 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: '#555', fontSize: 10 }} axisLine={false} tickLine={false}
-                    domain={['dataMin - 1', 'dataMax + 1']} />
-                  <Tooltip
-                    contentStyle={{ background: '#0d0d0d', border: '0.5px solid #252525', borderRadius: 8, fontSize: 11, color: '#c8c8c8' }}
-                    formatter={(v) => [`${v ?? 0} kg`, 'Gewicht']}
-                  />
+                    domain={['dataMin - 0.5', 'dataMax + 0.5']} tickFormatter={v => `${v}kg`} />
+                  <Tooltip {...TT} formatter={(v) => [`${v ?? 0} kg`, 'Gewicht']} />
                   <ReferenceLine y={weightGoal} stroke="#4ade80" strokeDasharray="4 4" strokeWidth={0.5}
-                    label={{ value: 'Ziel', fill: '#4ade80', fontSize: 9 }} />
-                  <Area type="monotone" dataKey="weight" stroke="#c8c8c8" strokeWidth={2}
-                    fill="url(#weightGrad)"
-                    dot={{ r: 3, fill: '#888', strokeWidth: 0 }}
+                    label={{ value: 'Ziel', fill: '#4ade80', fontSize: 9, position: 'right' }} />
+                  <Area type="monotone" dataKey="weight" stroke="#c8c8c8" strokeWidth={1.5}
+                    fill="url(#wGrad)"
+                    dot={{ r: 2.5, fill: '#888', strokeWidth: 0 }}
                     activeDot={{ r: 5, fill: '#c8c8c8', strokeWidth: 0 }} />
                 </AreaChart>
               </ResponsiveContainer>
-
-              {/* Weight stats row */}
-              <div style={{ display: 'flex', gap: 20, padding: '10px 0', borderBottom: '0.5px solid #1a1a1a', marginTop: 4 }}>
-                {([
-                  ['START', first != null ? `${first} kg` : '—'],
-                  ['AKTUELL', last != null ? `${last} kg` : '—'],
-                  ['ZIEL', `${weightGoal} kg`],
-                  ['DIFFERENZ', diff != null ? `${Number(diff) > 0 ? '+' : ''}${diff} kg` : '—'],
-                ] as const).map(([label, value]) => (
-                  <div key={label}>
-                    <div style={{ fontSize: 9, color: '#333', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{label}</div>
-                    <div style={{ fontSize: 13, color: '#c8c8c8', fontWeight: 500, marginTop: 2 }}>{value}</div>
-                  </div>
-                ))}
+              <div style={{ display: 'flex', gap: 20, padding: '10px 0 16px', borderBottom: '0.5px solid #1a1a1a' }}>
+                <StatCell label="Start"    value={first != null ? `${first} kg` : '—'} />
+                <StatCell label="Aktuell"  value={last  != null ? `${last} kg`  : '—'} />
+                <StatCell label="Ziel"     value={`${weightGoal} kg`} />
+                <StatCell label="Trend"    value={trend != null ? `${trend > 0 ? '+' : ''}${trend.toFixed(1)} kg` : '—'} />
+                <StatCell label="Einträge" value={String(weightData.length)} />
               </div>
             </div>
           )}
 
-          {/* ── Sleep chart ── */}
+          {/* Sleep chart */}
           {sleepData.length > 0 && (
             <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 9, color: '#333', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>
-                Schlaf (letzte 14 Tage)
-              </div>
-              <ResponsiveContainer width="100%" height={100}>
+              <div style={{ fontSize: 9, color: '#333', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>Schlaf (letzte 14 Tage)</div>
+              <ResponsiveContainer width="100%" height={120}>
                 <BarChart data={sleepData} barSize={8} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                  <XAxis dataKey="date" tick={{ fill: '#333', fontSize: 8 }} axisLine={false} tickLine={false} />
-                  <ReferenceLine y={sleepGoal} stroke="#252525" strokeDasharray="3 3" />
-                  <Tooltip
-                    contentStyle={{ background: '#0d0d0d', border: '0.5px solid #252525', borderRadius: 8, fontSize: 10 }}
-                    formatter={(v) => [`${v ?? 0}h`, 'Schlaf']}
-                  />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" vertical={false} />
+                  <XAxis dataKey="date" tick={{ fill: '#444', fontSize: 8 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: '#555', fontSize: 9 }} axisLine={false} tickLine={false}
+                    domain={[0, 10]} tickFormatter={v => `${v}h`} />
+                  <Tooltip {...TT} formatter={(v) => [`${v ?? 0}h`, 'Schlaf']} />
+                  <ReferenceLine y={sleepGoal} stroke="#6b7280" strokeDasharray="4 4" strokeWidth={0.5} />
                   <Bar dataKey="sleep" radius={[3, 3, 0, 0]}>
                     {sleepData.map((d, i) => (
-                      <Cell key={i} fill={d.sleep >= sleepGoal ? 'rgba(74,222,128,0.4)' : '#252525'} />
+                      <Cell key={i} fill={d.sleep >= sleepGoal ? 'rgba(74,222,128,0.4)' : 'rgba(107,114,128,0.25)'} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -166,23 +151,18 @@ export function HealthVerlauf({ onBack }: Props) {
             </div>
           )}
 
-          {/* ── Water chart ── */}
+          {/* Water chart */}
           {waterData.length > 0 && (
             <div style={{ marginBottom: 28 }}>
-              <div style={{ fontSize: 9, color: '#333', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>
-                Wasser (letzte 14 Tage)
-              </div>
+              <div style={{ fontSize: 9, color: '#333', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>Wasser (letzte 14 Tage)</div>
               <ResponsiveContainer width="100%" height={100}>
                 <BarChart data={waterData} barSize={8} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                  <XAxis dataKey="date" tick={{ fill: '#333', fontSize: 8 }} axisLine={false} tickLine={false} />
-                  <ReferenceLine y={waterGoal} stroke="#252525" strokeDasharray="3 3" />
-                  <Tooltip
-                    contentStyle={{ background: '#0d0d0d', border: '0.5px solid #252525', borderRadius: 8, fontSize: 10 }}
-                    formatter={(v) => [`${v ?? 0} Gläser`, 'Wasser']}
-                  />
+                  <XAxis dataKey="date" tick={{ fill: '#444', fontSize: 8 }} axisLine={false} tickLine={false} />
+                  <Tooltip {...TT} formatter={(v) => [`${v ?? 0}L`, 'Wasser']} />
+                  <ReferenceLine y={waterGoal} stroke="#4b7c9e" strokeDasharray="4 4" strokeWidth={0.5} />
                   <Bar dataKey="water" radius={[3, 3, 0, 0]}>
                     {waterData.map((d, i) => (
-                      <Cell key={i} fill={d.water >= waterGoal ? 'rgba(96,165,250,0.35)' : '#252525'} />
+                      <Cell key={i} fill={d.water >= waterGoal ? 'rgba(96,165,250,0.4)' : 'rgba(75,124,158,0.2)'} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -190,54 +170,30 @@ export function HealthVerlauf({ onBack }: Props) {
             </div>
           )}
 
-          {/* ── Timeline ── */}
+          {/* Timeline */}
           <div>
             {days.map((date, index) => {
               const m = metricMap.get(date)
-              const trend = m ? weightTrend(allMetrics, date) : null
-
+              const trendArrow = m ? weightTrend(allMetrics, date) : null
               return (
                 <div key={date} style={{ display: 'flex', gap: 16, alignItems: 'flex-start', paddingBottom: 24 }}>
                   <div style={{ width: 72, flexShrink: 0, textAlign: 'right' }}>
-                    <div style={{ fontSize: 10, color: '#888', fontWeight: 500, letterSpacing: '0.08em' }}>
-                      {dayName(date)}
-                    </div>
-                    <div style={{ fontSize: 9, color: '#333', marginTop: 2 }}>
-                      {formatDate(date)}
-                    </div>
+                    <div style={{ fontSize: 10, color: '#888', fontWeight: 500, letterSpacing: '0.08em' }}>{dayName(date)}</div>
+                    <div style={{ fontSize: 9, color: '#333', marginTop: 2 }}>{formatDate(date)}</div>
                   </div>
-
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-                    <div style={{
-                      width: 10, height: 10, borderRadius: '50%',
-                      background: m ? '#888' : 'transparent',
-                      border: '1px solid #333', marginTop: 2,
-                    }} />
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: m ? '#888' : 'transparent', border: '1px solid #333', marginTop: 2 }} />
                     <div style={{ width: 1, flex: 1, background: '#1a1a1a', minHeight: 40 }} />
                   </div>
-
-                  <motion.div
-                    initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.03 }}
-                    style={{ flex: 1, background: '#0d0d0d', border: '0.5px solid #1a1a1a',
-                      borderRadius: 9, padding: '10px 12px' }}>
+                  <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.03 }}
+                    style={{ flex: 1, background: '#0d0d0d', border: '0.5px solid #1a1a1a', borderRadius: 9, padding: '10px 12px' }}>
                     {m ? (
                       <>
                         {m.weight != null && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                            <span style={{ fontSize: 14, color: '#c0c0c0', fontWeight: 500 }}>
-                              {m.weight} kg
-                            </span>
-                            {trend && (
-                              <span style={{ fontSize: 10, color: trend === '↑' ? '#ef4444' : '#22c55e' }}>
-                                {trend}
-                              </span>
-                            )}
-                            {m.mood != null && (
-                              <span style={{ marginLeft: 'auto', fontSize: 10, color: '#555' }}>
-                                Mood {m.mood}/10
-                              </span>
-                            )}
+                            <span style={{ fontSize: 14, color: '#c0c0c0', fontWeight: 500 }}>{m.weight} kg</span>
+                            {trendArrow && <span style={{ fontSize: 10, color: trendArrow === '↑' ? '#ef4444' : '#22c55e' }}>{trendArrow}</span>}
+                            {m.mood != null && <span style={{ marginLeft: 'auto', fontSize: 10, color: '#555' }}>Mood {m.mood}/10</span>}
                           </div>
                         )}
                         {m.sleep != null && (
@@ -246,27 +202,21 @@ export function HealthVerlauf({ onBack }: Props) {
                               <span>Schlaf</span><span>{m.sleep}h</span>
                             </div>
                             <div style={{ height: 2, background: '#111', borderRadius: 1, overflow: 'hidden' }}>
-                              <motion.div
-                                initial={{ width: 0 }}
-                                animate={{ width: `${Math.min(m.sleep / sleepGoal * 100, 100)}%` }}
+                              <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(m.sleep / sleepGoal * 100, 100)}%` }}
                                 transition={{ delay: index * 0.03 + 0.1, duration: 0.4 }}
-                                style={{ height: '100%', background: '#8b5cf6', borderRadius: 1 }}
-                              />
+                                style={{ height: '100%', background: '#8b5cf6', borderRadius: 1 }} />
                             </div>
                           </div>
                         )}
                         {m.water != null && (
                           <div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#444', marginBottom: 3 }}>
-                              <span>Wasser</span><span>{m.water} Gläser</span>
+                              <span>Wasser</span><span>{m.water}L</span>
                             </div>
                             <div style={{ height: 2, background: '#111', borderRadius: 1, overflow: 'hidden' }}>
-                              <motion.div
-                                initial={{ width: 0 }}
-                                animate={{ width: `${Math.min(m.water / waterGoal * 100, 100)}%` }}
+                              <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(m.water / waterGoal * 100, 100)}%` }}
                                 transition={{ delay: index * 0.03 + 0.15, duration: 0.4 }}
-                                style={{ height: '100%', background: '#3b82f6', borderRadius: 1 }}
-                              />
+                                style={{ height: '100%', background: '#3b82f6', borderRadius: 1 }} />
                             </div>
                           </div>
                         )}
