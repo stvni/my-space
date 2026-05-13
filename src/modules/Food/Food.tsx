@@ -88,19 +88,12 @@ export function Food() {
   return (
     <PageTransition>
       <div className="p-4 md:p-6 max-w-4xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-start justify-between gap-3 mb-5 md:mb-6">
-          <div>
-            <SectionLabel>Food</SectionLabel>
-            <h1 className="chrome-text text-2xl font-semibold mt-1">Nutrition Log</h1>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {foodTab === 'heute' && (
-              <DatePicker
-                selected={selectedDate}
-                onChange={(d: Date | null) => d && setSelectedDate(d)}
-                dateFormat="yyyy-MM-dd"
-              />
-            )}
+        <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="mb-5 md:mb-6">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+            <div>
+              <SectionLabel>Food</SectionLabel>
+              <h1 className="chrome-text text-2xl font-semibold mt-1">Nutrition Log</h1>
+            </div>
             <div className="flex bg-surface2 rounded-lg border border-border p-1 gap-1">
               {(['heute', 'verlauf', 'rezepte'] as const).map(t => (
                 <motion.button key={t} onClick={() => setFoodTab(t)}
@@ -110,20 +103,32 @@ export function Food() {
                 </motion.button>
               ))}
             </div>
-            {foodTab === 'heute' && (
-              <motion.button onClick={() => setShowForm(s => !s)}
-                whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.97 }} transition={SPRING}
-                className="flex items-center gap-2 px-4 py-2 bg-surface2 border border-border rounded-lg text-sm text-chrome-dim hover:text-chrome hover:border-chrome/30 transition-all">
-                <Plus size={14} /> Add Meal
-              </motion.button>
-            )}
-            {foodTab === 'rezepte' && (
-              <motion.button onClick={() => { resetRecipeForm(); setShowRecipeForm(true) }}
-                whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.97 }} transition={SPRING}
-                className="flex items-center gap-2 px-4 py-2 bg-surface2 border border-border rounded-lg text-sm text-chrome-dim hover:text-chrome hover:border-chrome/30 transition-all">
-                <Plus size={14} /> Neues Rezept
-              </motion.button>
-            )}
+          </div>
+          {/* Action row — always same height, visibility controls shift-free show/hide */}
+          <div className="flex items-center justify-between" style={{ minHeight: 36 }}>
+            <div style={{ visibility: foodTab === 'heute' ? 'visible' : 'hidden' }}>
+              <DatePicker
+                selected={selectedDate}
+                onChange={(d: Date | null) => d && setSelectedDate(d)}
+                dateFormat="dd.MM.yyyy"
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ visibility: foodTab === 'heute' ? 'visible' : 'hidden' }}>
+                <motion.button onClick={() => setShowForm(s => !s)}
+                  whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.97 }} transition={SPRING}
+                  className="flex items-center gap-2 px-4 py-2 bg-surface2 border border-border rounded-lg text-sm text-chrome-dim hover:text-chrome hover:border-chrome/30 transition-all">
+                  <Plus size={14} /> Add Meal
+                </motion.button>
+              </div>
+              {foodTab === 'rezepte' && (
+                <motion.button onClick={() => { resetRecipeForm(); setShowRecipeForm(true) }}
+                  whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.97 }} transition={SPRING}
+                  className="flex items-center gap-2 px-4 py-2 bg-surface2 border border-border rounded-lg text-sm text-chrome-dim hover:text-chrome hover:border-chrome/30 transition-all">
+                  <Plus size={14} /> Neues Rezept
+                </motion.button>
+              )}
+            </div>
           </div>
         </motion.div>
 

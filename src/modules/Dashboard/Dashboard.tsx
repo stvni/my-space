@@ -5,6 +5,7 @@ import { db, getTodayDay, getTodayPlanIndex } from '../../db/db'
 import { PageTransition } from '../../components/layout/PageTransition'
 import { Card, SectionLabel } from '../../components/ui/Card'
 import { RingWidget } from '../../components/ui/RingWidget'
+import { DashboardGreeting } from '../../components/DashboardGreeting'
 import { CheckSquare, Apple, Droplets, Dumbbell } from 'lucide-react'
 import { format } from '../../utils/date'
 import { useCountUp } from '../../hooks/useCountUp'
@@ -27,6 +28,7 @@ export function Dashboard() {
   const todaySession = useLiveQuery(() => db.workoutSessions.where('date').equals(today).first(), [today])
   const gymPlanData = useLiveQuery(() => db.gymPlan.toArray(), []) ?? []
   const gymDayOverrides = useLiveQuery(() => db.gymDayOverrides.toArray(), []) ?? []
+  const todaySkincare = useLiveQuery(() => db.skincareDayLogs.where('date').equals(today).first(), [today])
 
   const totalCalories = todayMeals.reduce((s, m) => s + m.calories, 0)
   const calGoal = 2200
@@ -69,6 +71,16 @@ export function Dashboard() {
             {new Date().toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
           <h1 className="chrome-text text-2xl md:text-3xl font-semibold tracking-tight">{getGreeting()}, Stefano</h1>
+          <DashboardGreeting progressData={{
+            gymDone,
+            gymTotal: totalExercises,
+            calories: totalCalories,
+            calorieGoal: calGoal,
+            zhawDone: 0,
+            zhawTodos: zhawTasks.length,
+            skincareDone: todaySkincare?.morningDone ?? 0,
+            skincareSteps: todaySkincare?.morningTotal ?? 4,
+          }} />
         </motion.div>
 
         {/* Rings row */}

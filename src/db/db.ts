@@ -66,6 +66,9 @@ export interface CalendarEvent {
   title: string
   date: string
   time?: string
+  start?: number
+  end?: number
+  location?: string
   category: string
   color: string
   notes?: string
@@ -291,6 +294,27 @@ class MySpaceDB extends Dexie {
       healthGoals: '++id',
     })
     this.version(6).stores({
+      todos: '++id, module, done, dueDate, createdAt',
+      gymLogs: '++id, date',
+      meals: '++id, date, mealType',
+      skincareSteps: '++id, routine, order',
+      styleItems: '++id, category, owned, wishlist, createdAt',
+      zhawTasks: '++id, module, dueDate, done, priority, createdAt',
+      calendarEvents: '++id, date, category',
+      healthMetrics: '++id, date',
+      pomodoroSessions: '++id, date, completed',
+      gymPlan: '++id, day',
+      profile: '++id',
+      exerciseLogs: '++id, date, exerciseName',
+      gymLog: '++id, date, exerciseName, status',
+      exercises: '++id, name, muscleGroup',
+      gymDayOverrides: '++id, dayIndex',
+      workoutSessions: '++id, date, dayIndex',
+      recipes: '++id, name, category',
+      healthGoals: '++id',
+      skincareDayLogs: '++id, date',
+    })
+    this.version(7).stores({
       todos: '++id, module, done, dueDate, createdAt',
       gymLogs: '++id, date',
       meals: '++id, date, mealType',
