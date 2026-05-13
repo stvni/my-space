@@ -10,8 +10,6 @@ import { today } from '../../utils/date'
 const EVENT_COLORS = ['#3b82f6', '#8b5cf6', '#22c55e', '#f97316', '#ec4899', '#c0c0c0']
 const CATEGORIES = ['Personal', 'ZHAW', 'Gym', 'Health', 'Other']
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
-const SPRING = { type: 'spring', stiffness: 400, damping: 25 } as const
-
 function getSwissDay(date: Date): number {
   const d = date.getDay()
   return d === 0 ? 6 : d - 1
