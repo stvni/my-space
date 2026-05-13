@@ -85,9 +85,9 @@ export function Kalender() {
 
   return (
     <PageTransition>
-      <div className="p-6 max-w-5xl mx-auto">
+      <div className="p-4 md:p-6 max-w-5xl mx-auto">
         {/* Header */}
-        <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between mb-6">
+        <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-center justify-between gap-3 mb-5 md:mb-6">
           <div>
             <SectionLabel>Kalender</SectionLabel>
             <h1 className="chrome-text text-2xl font-semibold mt-1">
@@ -109,7 +109,7 @@ export function Kalender() {
           </div>
         </motion.div>
 
-        <div className="grid grid-cols-[1fr_280px] gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-4">
           {/* Calendar grid */}
           <Card>
             <div className="grid grid-cols-7 mb-2">

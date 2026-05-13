@@ -118,3 +118,21 @@
   text-align: center;
 }
 .react-datepicker__input-container input:focus { border-color: #333; }
+
+/* ── Mobile responsive ── */
+@media (max-width: 768px) {
+  /* Prevent bounce-scroll on iOS */
+  html { height: -webkit-fill-available; }
+  body { height: -webkit-fill-available; }
+  #root { height: -webkit-fill-available; }
+
+  /* Calendar cells — tighter on small screens */
+  .cal-week-label { font-size: 9px !important; }
+  .cal-day-btn { font-size: 11px !important; }
+
+  /* Timeline date column — narrower */
+  .timeline-date-col { width: 56px !important; min-width: 56px !important; }
+
+  /* Recharts — prevent overflow */
+  .recharts-responsive-container { overflow: hidden; }
+}

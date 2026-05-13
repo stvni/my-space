@@ -57,18 +57,18 @@ export function Dashboard() {
 
   return (
     <PageTransition>
-      <div className="p-6 max-w-5xl mx-auto" style={{ position: 'relative', zIndex: 1 }}>
+      <div className="p-4 md:p-6 max-w-5xl mx-auto" style={{ position: 'relative', zIndex: 1 }}>
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-          className="mb-8"
+          className="mb-5 md:mb-8"
         >
           <p className="text-chrome-dim text-xs font-mono uppercase tracking-widest mb-1">
             {new Date().toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
-          <h1 className="chrome-text text-3xl font-semibold tracking-tight">{getGreeting()}, Stefano</h1>
+          <h1 className="chrome-text text-2xl md:text-3xl font-semibold tracking-tight">{getGreeting()}, Stefano</h1>
         </motion.div>
 
         {/* Rings row */}
@@ -76,7 +76,7 @@ export function Dashboard() {
           variants={stagger}
           initial="hidden"
           animate="show"
-          className="grid grid-cols-4 gap-4 mb-6"
+          className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-5 md:mb-6"
         >
           <Card delay={0} className="flex flex-col items-center gap-2 py-5 cursor-pointer" onClick={() => navigate('/food')}>
             <RingWidget value={totalCalories} max={calGoal} size={96} strokeWidth={7} color="#f97316" label={`${animatedCalories}`} sublabel="kcal" />
@@ -103,7 +103,7 @@ export function Dashboard() {
         </motion.div>
 
         {/* Two-column layout */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Left col */}
           <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-4">
             <Card delay={0.28} className="cursor-pointer" onClick={() => navigate('/zhaw')}>

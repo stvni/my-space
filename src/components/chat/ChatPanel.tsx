@@ -71,25 +71,25 @@ export function ChatPanel() {
 
   return (
     <>
-      {/* Trigger button */}
+      {/* Trigger button — above bottom nav on mobile */}
       <motion.button
         onClick={() => setOpen((o) => !o)}
-        className="fixed bottom-5 right-5 z-50 w-11 h-11 rounded-full bg-surface2 border border-border text-chrome-dim hover:text-chrome-bright hover:border-chrome/30 flex items-center justify-center shadow-lg transition-colors"
+        className="fixed bottom-20 md:bottom-5 right-4 md:right-5 z-[110] w-12 h-12 rounded-full bg-surface2 border border-border text-chrome-dim hover:text-chrome-bright hover:border-chrome/30 flex items-center justify-center shadow-lg transition-colors"
         whileTap={{ scale: 0.92 }}
         whileHover={{ scale: 1.06 }}
       >
         {open ? <X size={16} /> : <MessageSquare size={16} />}
       </motion.button>
 
-      {/* Panel */}
+      {/* Panel — full-screen on mobile, floating on desktop */}
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.96 }}
+            initial={{ opacity: 0, y: 20, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.96 }}
+            exit={{ opacity: 0, y: 20, scale: 0.98 }}
             transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-            className="fixed bottom-20 right-5 z-50 w-80 h-[480px] surface-glass rounded-2xl flex flex-col overflow-hidden shadow-2xl"
+            className="fixed inset-x-0 top-0 bottom-16 md:inset-x-auto md:top-auto md:bottom-20 md:right-5 md:w-80 md:h-[480px] z-[200] surface-glass rounded-none md:rounded-2xl flex flex-col overflow-hidden shadow-2xl"
           >
             {/* Header */}
             <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
