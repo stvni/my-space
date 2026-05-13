@@ -9,7 +9,10 @@ import { today } from '../../utils/date'
 
 const SPRING = { type: 'spring', stiffness: 400, damping: 25 } as const
 
-const DEFAULT_GOALS: Omit<HealthGoals, 'id'> = { calories: 2200, water: 8, weight: 70, steps: 10000, sleep: 8 }
+const DEFAULT_GOALS: Omit<HealthGoals, 'id'> = {
+  calories: 2600, protein: 150, carbs: 330, fat: 75,
+  water: 3.0, weight: 72, steps: 10000, sleep: 8,
+}
 
 export function Health() {
   const [tab, setTab] = useState<'heute' | 'verlauf' | 'ziele'>('heute')
@@ -35,7 +38,16 @@ export function Health() {
   }, [todayMetrics, profile])
 
   useEffect(() => {
-    if (savedGoals) setGoals({ calories: savedGoals.calories, water: savedGoals.water, weight: savedGoals.weight, steps: savedGoals.steps, sleep: savedGoals.sleep })
+    if (savedGoals) setGoals({
+      calories: savedGoals.calories,
+      protein:  savedGoals.protein  ?? DEFAULT_GOALS.protein,
+      carbs:    savedGoals.carbs    ?? DEFAULT_GOALS.carbs,
+      fat:      savedGoals.fat      ?? DEFAULT_GOALS.fat,
+      water:    savedGoals.water,
+      weight:   savedGoals.weight,
+      steps:    savedGoals.steps,
+      sleep:    savedGoals.sleep,
+    })
   }, [savedGoals])
 
   const saveMetrics = async () => {
@@ -59,18 +71,21 @@ export function Health() {
   }
 
   const METRICS_CONFIG = [
-    { key: 'weight', label: 'Weight', unit: 'kg', max: goals.weight * 1.5 || 120, color: '#c0c0c0', step: 0.1 },
-    { key: 'sleep', label: 'Sleep', unit: 'hrs', max: goals.sleep * 1.25 || 10, color: '#8b5cf6', step: 0.5 },
-    { key: 'water', label: 'Water', unit: 'glasses', max: goals.water, color: '#3b82f6', step: 1 },
-    { key: 'steps', label: 'Steps', unit: 'steps', max: goals.steps, color: '#22c55e', step: 100 },
+    { key: 'weight', label: 'Weight', unit: 'kg',    max: goals.weight * 1.5 || 120, color: '#c0c0c0', step: 0.1 },
+    { key: 'sleep',  label: 'Sleep',  unit: 'hrs',   max: goals.sleep * 1.25 || 10,  color: '#8b5cf6', step: 0.5 },
+    { key: 'water',  label: 'Water',  unit: 'L',     max: goals.water,                color: '#3b82f6', step: 0.25 },
+    { key: 'steps',  label: 'Steps',  unit: 'steps', max: goals.steps,                color: '#22c55e', step: 100 },
   ]
 
-  const GOALS_CONFIG: { key: keyof typeof goals; label: string; unit: string; step: number }[] = [
-    { key: 'calories', label: 'Kalorien', unit: 'kcal', step: 50 },
-    { key: 'water', label: 'Wasser', unit: 'Gläser', step: 1 },
-    { key: 'weight', label: 'Zielgewicht', unit: 'kg', step: 0.5 },
-    { key: 'steps', label: 'Schritte', unit: 'steps', step: 500 },
-    { key: 'sleep', label: 'Schlaf', unit: 'Std', step: 0.5 },
+  const GOALS_CONFIG: { key: keyof typeof goals; label: string; unit: string; step: number; hint: string }[] = [
+    { key: 'calories', label: 'Kalorienziel',  unit: 'kcal', step: 50,   hint: 'Lean Bulk — Überschuss' },
+    { key: 'protein',  label: 'Protein',        unit: 'g',    step: 5,    hint: '2.2g × Körpergewicht' },
+    { key: 'carbs',    label: 'Kohlenhydrate',  unit: 'g',    step: 5,    hint: 'Energie für Training' },
+    { key: 'fat',      label: 'Fett',           unit: 'g',    step: 2.5,  hint: 'Hormone & Erholung' },
+    { key: 'water',    label: 'Hydration',      unit: 'L',    step: 0.25, hint: 'inkl. Training' },
+    { key: 'weight',   label: 'Zielgewicht',    unit: 'kg',   step: 0.5,  hint: 'Zielgewicht' },
+    { key: 'steps',    label: 'Steps',          unit: '/Tag', step: 500,  hint: 'Tägliche Schritte' },
+    { key: 'sleep',    label: 'Schlaf',         unit: 'h',    step: 0.5,  hint: 'Erholungsschlaf' },
   ]
 
   return (
@@ -178,34 +193,38 @@ export function Health() {
 
           {tab === 'ziele' && (
             <motion.div key="ziele" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <div className="space-y-3">
-                <p className="text-xs text-chrome-dim mb-4">Tagesziele — werden als Referenz in der App verwendet.</p>
+              <div style={{ background: '#0d0d0d', border: '0.5px solid #1a1a1a', borderRadius: 12, padding: '4px 16px' }}>
+                <p className="text-xs text-chrome-dim" style={{ padding: '10px 0 6px', borderBottom: '0.5px solid #1a1a1a' }}>
+                  Tagesziele — werden als Referenz in der App verwendet.
+                </p>
                 {GOALS_CONFIG.map((g, i) => (
-                  <Card key={g.key} delay={i * 0.06}>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <SectionLabel>{g.label}</SectionLabel>
-                        <p className="text-xs text-chrome-dim mt-0.5">{g.unit}</p>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div key={g.key} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '12px 0',
+                    borderBottom: i < GOALS_CONFIG.length - 1 ? '0.5px solid #1a1a1a' : 'none',
+                  }}>
+                    <div>
+                      <div style={{ fontSize: 12, color: '#888' }}>{g.label}</div>
+                      <div style={{ fontSize: 9, color: '#333', marginTop: 2, letterSpacing: '0.1em' }}>{g.hint}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <motion.button
                           whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.94 }} transition={SPRING}
                           onClick={() => updateGoal(g.key, -g.step)}
-                          style={{ width: 32, height: 32, border: '0.5px solid #252525', borderRadius: 8,
-                            background: 'transparent', color: '#666', fontSize: 18, cursor: 'pointer',
+                          style={{ width: 28, height: 28, border: '0.5px solid #252525', borderRadius: 6,
+                            background: 'transparent', color: '#555', fontSize: 16, cursor: 'pointer',
                             display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</motion.button>
-                        <span style={{ fontSize: 18, color: '#c8c8c8', minWidth: 80, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
-                          {goals[g.key]}
+                        <span style={{ fontSize: 13, fontWeight: 500, color: '#c8c8c8', minWidth: 80, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
+                          {+goals[g.key].toFixed(2)} {g.unit}
                         </span>
                         <motion.button
                           whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.94 }} transition={SPRING}
                           onClick={() => updateGoal(g.key, g.step)}
-                          style={{ width: 32, height: 32, border: '0.5px solid #252525', borderRadius: 8,
+                          style={{ width: 28, height: 28, border: '0.5px solid #252525', borderRadius: 6,
                             background: 'transparent', color: '#666', fontSize: 18, cursor: 'pointer',
                             display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</motion.button>
                       </div>
-                    </div>
-                  </Card>
+                  </div>
                 ))}
               </div>
             </motion.div>

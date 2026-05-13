@@ -181,6 +181,9 @@ export interface Recipe {
 export interface HealthGoals {
   id?: number
   calories: number
+  protein: number
+  carbs: number
+  fat: number
   water: number
   weight: number
   steps: number
@@ -335,6 +338,39 @@ class MySpaceDB extends Dexie {
       healthGoals: '++id',
       skincareDayLogs: '++id, date',
     })
+    this.version(8).stores({
+      todos: '++id, module, done, dueDate, createdAt',
+      gymLogs: '++id, date',
+      meals: '++id, date, mealType',
+      skincareSteps: '++id, routine, order',
+      styleItems: '++id, category, owned, wishlist, createdAt',
+      zhawTasks: '++id, module, dueDate, done, priority, createdAt',
+      calendarEvents: '++id, date, category',
+      healthMetrics: '++id, date',
+      pomodoroSessions: '++id, date, completed',
+      gymPlan: '++id, day',
+      profile: '++id',
+      exerciseLogs: '++id, date, exerciseName',
+      gymLog: '++id, date, exerciseName, status',
+      exercises: '++id, name, muscleGroup',
+      gymDayOverrides: '++id, dayIndex',
+      workoutSessions: '++id, date, dayIndex',
+      recipes: '++id, name, category',
+      healthGoals: '++id',
+      skincareDayLogs: '++id, date',
+    })
+  }
+}
+
+export async function seedHealthGoals() {
+  const existing = await db.healthGoals.get(1)
+  if (!existing) {
+    await db.healthGoals.put({
+      id: 1, calories: 2600, protein: 150, carbs: 330, fat: 75,
+      water: 3.0, weight: 72, steps: 10000, sleep: 8,
+    })
+  } else if (!existing.protein) {
+    await db.healthGoals.update(1, { calories: 2600, protein: 150, carbs: 330, fat: 75, water: 3.0 })
   }
 }
 

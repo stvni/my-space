@@ -13,7 +13,7 @@ import { Skincare } from './modules/Skincare/Skincare'
 import { StyleBoard } from './modules/StyleBoard/StyleBoard'
 import { IntroScreen } from './components/IntroScreen'
 import { ChromeBackground } from './components/ChromeBackground'
-import { seedGymPlan, seedProfile, seedExerciseLibrary } from './db/db'
+import { seedGymPlan, seedProfile, seedExerciseLibrary, seedHealthGoals } from './db/db'
 
 function AnimatedRoutes() {
   const location = useLocation()
@@ -45,6 +45,7 @@ export default function App() {
     seedGymPlan()
     seedProfile()
     seedExerciseLibrary()
+    seedHealthGoals()
   }, [])
 
   return (

@@ -11,9 +11,7 @@ interface ProgressData {
   skincareSteps: number
 }
 
-const PULSE_STYLE: React.CSSProperties = {
-  width: 4, height: 4, borderRadius: '50%', background: '#333',
-}
+const PULSE: React.CSSProperties = { width: 4, height: 4, borderRadius: '50%', background: '#333' }
 
 export function DashboardGreeting({ progressData }: { progressData: ProgressData }) {
   const [greeting, setGreeting] = useState('')
@@ -21,6 +19,19 @@ export function DashboardGreeting({ progressData }: { progressData: ProgressData
 
   const generate = useCallback(async () => {
     setLoading(true)
+    setGreeting('')
+
+    const safe = {
+      gymDone:       progressData?.gymDone       ?? 0,
+      gymTotal:      progressData?.gymTotal       ?? 0,
+      calories:      progressData?.calories       ?? 0,
+      calorieGoal:   progressData?.calorieGoal    ?? 2600,
+      zhawDone:      progressData?.zhawDone       ?? 0,
+      zhawTodos:     progressData?.zhawTodos      ?? 0,
+      skincareDone:  progressData?.skincareDone   ?? 0,
+      skincareSteps: progressData?.skincareSteps  ?? 4,
+    }
+
     const hour = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Zurich' })).getHours()
     const timeOfDay =
       hour < 7  ? 'early morning (just woke up)' :
@@ -29,15 +40,14 @@ export function DashboardGreeting({ progressData }: { progressData: ProgressData
       hour < 18 ? 'afternoon' :
       hour < 22 ? 'evening' : 'late night'
 
-    const { gymDone, gymTotal, calories, calorieGoal, zhawDone, zhawTodos, skincareDone, skincareSteps } = progressData
     const overallPct = Math.round(
-      ((gymDone / Math.max(gymTotal, 1)) +
-       (calories / calorieGoal) +
-       (zhawDone / Math.max(zhawTodos, 1)) +
-       (skincareDone / Math.max(skincareSteps, 1))) / 4 * 100
+      ((safe.gymDone / Math.max(safe.gymTotal, 1)) +
+       (safe.calories / safe.calorieGoal) +
+       (safe.zhawDone / Math.max(safe.zhawTodos, 1)) +
+       (safe.skincareDone / Math.max(safe.skincareSteps, 1))) / 4 * 100
     )
 
-    const system = `You are the personal assistant of Stefano, a Swiss Wirtschaftsinformatik student at ZHAW. He is 172cm, 49kg, trains Push/Pull/Legs, tracks calories (goal: ${calorieGoal}kcal), does skincare, wants to build muscle and a V-shape physique.
+    const system = `You are the personal assistant of Stefano, a Swiss Wirtschaftsinformatik student at ZHAW. He is 172cm, 49kg, trains Push/Pull/Legs, tracks calories (goal: ${safe.calorieGoal}kcal), does skincare, wants to build muscle and a V-shape physique.
 
 Write exactly 2-3 short sentences in German (Swiss context). Be direct, personal, honest.
 - Morning with 0% done: motivate, give a clear focus for the day
@@ -48,15 +58,15 @@ Write exactly 2-3 short sentences in German (Swiss context). Be direct, personal
 - No emojis. No markdown. Just 2-3 direct sentences.`
 
     const userMsg = `Time: ${timeOfDay}. Overall progress today: ${overallPct}%.
-Gym: ${gymDone}/${gymTotal} exercises done.
-Calories: ${calories}/${calorieGoal} kcal logged.
-ZHAW todos: ${zhawDone}/${zhawTodos} done.
-Skincare: ${skincareDone}/${skincareSteps} steps done.
+Gym: ${safe.gymDone}/${safe.gymTotal} exercises done.
+Calories: ${safe.calories}/${safe.calorieGoal} kcal logged.
+ZHAW todos: ${safe.zhawDone}/${safe.zhawTodos} done.
+Skincare: ${safe.skincareDone}/${safe.skincareSteps} steps done.
 Write the greeting now.`
 
     const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
     if (!apiKey) {
-      setGreeting('Setze VITE_ANTHROPIC_API_KEY in .env um die KI-Begrüssung zu aktivieren.')
+      setGreeting('API Key fehlt — in Vercel Environment Variables eintragen.')
       setLoading(false)
       return
     }
@@ -68,19 +78,20 @@ Write the greeting now.`
           'Content-Type': 'application/json',
           'x-api-key': apiKey,
           'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-allow-browser': 'true',
+          'anthropic-dangerous-direct-browser-access': 'true',
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
+          model: 'claude-sonnet-4-6',
           max_tokens: 150,
           system,
           messages: [{ role: 'user', content: userMsg }],
         }),
       })
       const data = await res.json()
-      setGreeting(data.content?.[0]?.text ?? '—')
+      const text = data.content?.[0]?.text?.trim()
+      setGreeting(text || 'Lade Empfehlung...')
     } catch {
-      setGreeting('—')
+      setGreeting('Verbindungsfehler — bitte erneut versuchen.')
     }
     setLoading(false)
   }, [progressData])
@@ -92,7 +103,7 @@ Write the greeting now.`
       {loading ? (
         <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
           {[0, 1, 2].map(i => (
-            <div key={i} style={{ ...PULSE_STYLE, animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite` }} />
+            <div key={i} style={{ ...PULSE, animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite` }} />
           ))}
         </div>
       ) : (

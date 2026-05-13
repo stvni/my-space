@@ -14,7 +14,7 @@ const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'] as const
 const MEAL_COLORS: Record<string, string> = {
   breakfast: '#f97316', lunch: '#22c55e', dinner: '#3b82f6', snack: '#8b5cf6',
 }
-const MACRO_GOALS = { calories: 2200, protein: 160, carbs: 260, fat: 70 }
+const DEFAULT_MACRO_GOALS = { calories: 2600, protein: 150, carbs: 330, fat: 75 }
 const SPRING = { type: 'spring', stiffness: 400, damping: 25 } as const
 const RECIPE_CATEGORIES = ['Frühstück', 'Mittagessen', 'Abendessen', 'Snack', 'Meal Prep']
 
@@ -34,6 +34,13 @@ export function Food() {
 
   const meals = useLiveQuery(() => db.meals.where('date').equals(date).toArray(), [date]) ?? []
   const recipes = useLiveQuery(() => db.recipes.orderBy('name').toArray(), []) ?? []
+  const savedGoals = useLiveQuery(() => db.healthGoals.get(1), [])
+  const MACRO_GOALS = {
+    calories: savedGoals?.calories ?? DEFAULT_MACRO_GOALS.calories,
+    protein:  savedGoals?.protein  ?? DEFAULT_MACRO_GOALS.protein,
+    carbs:    savedGoals?.carbs    ?? DEFAULT_MACRO_GOALS.carbs,
+    fat:      savedGoals?.fat      ?? DEFAULT_MACRO_GOALS.fat,
+  }
 
   const totals = meals.reduce(
     (acc, m) => ({ calories: acc.calories + m.calories, protein: acc.protein + m.protein, carbs: acc.carbs + m.carbs, fat: acc.fat + m.fat }),

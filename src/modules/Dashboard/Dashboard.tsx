@@ -30,8 +30,9 @@ export function Dashboard() {
   const gymDayOverrides = useLiveQuery(() => db.gymDayOverrides.toArray(), []) ?? []
   const todaySkincare = useLiveQuery(() => db.skincareDayLogs.where('date').equals(today).first(), [today])
 
+  const healthGoals = useLiveQuery(() => db.healthGoals.get(1), [])
   const totalCalories = todayMeals.reduce((s, m) => s + m.calories, 0)
-  const calGoal = 2200
+  const calGoal = healthGoals?.calories ?? 2600
   const waterGoal = 8
   const water = todayHealth?.water ?? 0
 
