@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Global overflow guard ── */
+html, body, #root {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 /* ── Safe area CSS variables (Dynamic Island / notch) ── */
 :root {
   --sat: env(safe-area-inset-top);

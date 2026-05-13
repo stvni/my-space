@@ -60,8 +60,8 @@ export function StyleBoard() {
 
   return (
     <PageTransition>
-      <div className="p-6 max-w-5xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between mb-6">
+      <div className="p-4 md:p-6 max-w-5xl mx-auto">
+        <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-start justify-between gap-3 mb-5 md:mb-6">
           <div>
             <SectionLabel>Style Board</SectionLabel>
             <h1 className="chrome-text text-2xl font-semibold mt-1">Wardrobe</h1>

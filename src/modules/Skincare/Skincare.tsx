@@ -120,8 +120,8 @@ export function Skincare() {
 
   return (
     <PageTransition>
-      <div className="p-6 max-w-4xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between mb-6">
+      <div className="p-4 md:p-6 max-w-4xl mx-auto">
+        <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-start justify-between gap-3 mb-5 md:mb-6">
           <div>
             <SectionLabel>Skincare</SectionLabel>
             <h1 className="chrome-text text-2xl font-semibold mt-1">Daily Routine</h1>
@@ -158,7 +158,7 @@ export function Skincare() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-[1fr_280px] gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-4">
                 <div className="space-y-4">
                   <Card>
                     <SectionLabel>{routine === 'am' ? 'Morning Routine' : 'Evening Routine'}</SectionLabel>

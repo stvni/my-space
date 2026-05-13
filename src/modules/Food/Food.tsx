@@ -87,13 +87,13 @@ export function Food() {
 
   return (
     <PageTransition>
-      <div className="p-6 max-w-4xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between mb-6">
+      <div className="p-4 md:p-6 max-w-4xl mx-auto">
+        <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-start justify-between gap-3 mb-5 md:mb-6">
           <div>
             <SectionLabel>Food</SectionLabel>
             <h1 className="chrome-text text-2xl font-semibold mt-1">Nutrition Log</h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             {foodTab === 'heute' && (
               <DatePicker
                 selected={selectedDate}
@@ -132,7 +132,7 @@ export function Food() {
           {foodTab === 'heute' && (
             <motion.div key="heute" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               {/* Macro rings */}
-              <div className="grid grid-cols-4 gap-4 mb-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-5 md:mb-6">
                 {[
                   { key: 'calories', label: 'Calories', color: '#f97316', unit: 'kcal', val: totals.calories, max: MACRO_GOALS.calories },
                   { key: 'protein', label: 'Protein', color: '#3b82f6', unit: 'g', val: totals.protein, max: MACRO_GOALS.protein },
@@ -195,7 +195,7 @@ export function Food() {
                       <div className="space-y-3">
                         <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Food name…"
                           className="w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-chrome outline-none focus:border-chrome/30" />
-                        <div className="grid grid-cols-4 gap-2">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                           {(['calories', 'protein', 'carbs', 'fat'] as const).map(k => (
                             <div key={k}>
                               <p className="text-xs text-chrome-dim mb-1 capitalize">{k} {k === 'calories' ? '(kcal)' : '(g)'}</p>
@@ -204,7 +204,7 @@ export function Food() {
                             </div>
                           ))}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           {MEAL_TYPES.map(t => (
                             <motion.button key={t} onClick={() => setForm(f => ({ ...f, mealType: t }))}
                               whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.97 }} transition={SPRING}
@@ -297,7 +297,7 @@ export function Food() {
                           className="w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-chrome-dim outline-none">
                           {RECIPE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
-                        <div className="grid grid-cols-4 gap-2">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                           {(['calories', 'protein', 'carbs', 'fat'] as const).map(k => (
                             <div key={k}>
                               <p className="text-xs text-chrome-dim mb-1 capitalize">{k} {k === 'calories' ? '(kcal)' : '(g)'}</p>

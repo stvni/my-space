@@ -76,8 +76,8 @@ export function Health() {
 
   return (
     <PageTransition>
-      <div className="p-6 max-w-4xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between mb-6">
+      <div className="p-4 md:p-6 max-w-4xl mx-auto">
+        <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-start justify-between gap-3 mb-5 md:mb-6">
           <div>
             <SectionLabel>Health</SectionLabel>
             <div className="flex items-center gap-3 mt-1">
@@ -101,7 +101,7 @@ export function Health() {
         <AnimatePresence mode="wait">
           {tab === 'heute' && (
             <motion.div key="heute" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                 {METRICS_CONFIG.map((m, i) => (
                   <Card key={m.key} delay={i * 0.07} className="flex items-center gap-4">
                     <RingWidget value={metrics[m.key as keyof typeof metrics]} max={m.max}

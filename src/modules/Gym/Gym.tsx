@@ -229,7 +229,7 @@ export function Gym() {
   if (showVerlauf) {
     return (
       <PageTransition>
-        <div className="p-6 max-w-4xl mx-auto">
+        <div className="p-4 md:p-6 max-w-4xl mx-auto">
           <GymVerlauf onBack={() => setShowVerlauf(false)} />
         </div>
       </PageTransition>
@@ -238,9 +238,9 @@ export function Gym() {
 
   return (
     <PageTransition>
-      <div className="p-6 max-w-4xl mx-auto" style={{ position: 'relative', zIndex: 1 }}>
+      <div className="p-4 md:p-6 max-w-4xl mx-auto" style={{ position: 'relative', zIndex: 1 }}>
         {/* Header */}
-        <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between mb-6">
+        <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-start justify-between gap-3 mb-5 md:mb-6">
           <div>
             <SectionLabel>Gym</SectionLabel>
             <h1 className="chrome-text text-2xl font-semibold mt-1">Training Log</h1>
@@ -274,7 +274,7 @@ export function Gym() {
           {gymTab === 'plan' && (
             <motion.div key="plan" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               {/* Stats row */}
-              <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-3 gap-2 md:gap-4 mb-5 md:mb-6">
                 {[
                   { label: 'This Week', value: `${weekSessions.length} sessions` },
                   { label: 'Weekly Volume', value: weeklyVolume > 0 ? `${Math.round(weeklyVolume / 100) / 10}k kg` : '—' },
