@@ -3,8 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { motion, AnimatePresence } from 'framer-motion'
 import { db, type HealthGoals } from '../../db/db'
 import { PageTransition } from '../../components/layout/PageTransition'
-import { Card, SectionLabel, AnimatedBar } from '../../components/ui/Card'
-import { RingWidget } from '../../components/ui/RingWidget'
+import { Card, SectionLabel } from '../../components/ui/Card'
 import { HealthVerlauf } from '../../components/Timeline/HealthVerlauf'
 import { today } from '../../utils/date'
 
@@ -101,28 +100,55 @@ export function Health() {
         <AnimatePresence mode="wait">
           {tab === 'heute' && (
             <motion.div key="heute" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>
                 {METRICS_CONFIG.map((m, i) => (
-                  <Card key={m.key} delay={i * 0.07} className="flex items-center gap-4">
-                    <RingWidget value={metrics[m.key as keyof typeof metrics]} max={m.max}
-                      size={72} strokeWidth={6} color={m.color}
-                      label={String(metrics[m.key as keyof typeof metrics])} sublabel={m.unit} />
-                    <div className="flex-1">
-                      <SectionLabel>{m.label}</SectionLabel>
-                      <input type="number" step={m.step}
-                        value={metrics[m.key as keyof typeof metrics]}
-                        onChange={e => setMetrics(prev => ({ ...prev, [m.key]: +e.target.value }))}
-                        className="mt-1 w-full bg-surface2 border border-border rounded-lg px-3 py-1.5 text-sm text-chrome outline-none focus:border-chrome/30" />
-                      <div className="mt-2">
-                        <AnimatedBar value={metrics[m.key as keyof typeof metrics] as number} max={m.max} color={m.color} delay={i * 0.07 + 0.1} />
+                  <motion.div
+                    key={m.key}
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.07, duration: 0.4, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
+                    style={{
+                      background: '#0d0d0d', border: '0.5px solid #1a1a1a',
+                      borderRadius: 12, padding: '16px 20px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      width: '100%',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 9, letterSpacing: '0.12em', color: '#333', textTransform: 'uppercase', marginBottom: 4 }}>
+                        {m.label}
                       </div>
+                      <div style={{ fontSize: 28, fontWeight: 500, color: m.color, lineHeight: 1.1 }}>
+                        {metrics[m.key as keyof typeof metrics]}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>{m.unit}</div>
                     </div>
-                  </Card>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <motion.button
+                        whileTap={{ scale: 0.9 }} transition={SPRING}
+                        onClick={() => setMetrics(prev => {
+                          const curr = prev[m.key as keyof typeof prev] as number
+                          return { ...prev, [m.key]: Math.max(0, +(curr - m.step).toFixed(2)) }
+                        })}
+                        style={{ width: 36, height: 36, borderRadius: 8, border: '0.5px solid #252525',
+                          background: 'transparent', color: '#666', fontSize: 18, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</motion.button>
+                      <motion.button
+                        whileTap={{ scale: 0.9 }} transition={SPRING}
+                        onClick={() => setMetrics(prev => {
+                          const curr = prev[m.key as keyof typeof prev] as number
+                          return { ...prev, [m.key]: +(curr + m.step).toFixed(2) }
+                        })}
+                        style={{ width: 36, height: 36, borderRadius: 8, border: '0.5px solid #252525',
+                          background: 'transparent', color: '#666', fontSize: 18, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</motion.button>
+                    </div>
+                  </motion.div>
                 ))}
 
-                <Card delay={0.28} className="col-span-2">
+                <Card delay={0.32}>
                   <SectionLabel>Mood</SectionLabel>
-                  <div className="flex gap-2 mt-3 justify-center">
+                  <div className="flex flex-wrap gap-2 mt-3 justify-center">
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(v => (
                       <motion.button key={v} whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.97 }} transition={SPRING}
                         onClick={() => setMetrics(m => ({ ...m, mood: v }))}
@@ -136,8 +162,8 @@ export function Health() {
                 </Card>
 
                 <motion.button onClick={saveMetrics}
-                  whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.97 }} transition={SPRING}
-                  className="col-span-2 py-2.5 bg-surface2 border border-border rounded-xl text-sm text-chrome hover:border-chrome/30 transition-colors">
+                  whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} transition={SPRING}
+                  className="w-full py-2.5 bg-surface2 border border-border rounded-xl text-sm text-chrome hover:border-chrome/30 transition-colors">
                   Save Today's Metrics
                 </motion.button>
               </div>

@@ -274,16 +274,18 @@ export function Gym() {
           {gymTab === 'plan' && (
             <motion.div key="plan" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               {/* Stats row */}
-              <div className="grid grid-cols-3 gap-2 md:gap-4 mb-5 md:mb-6">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginBottom: 20 }}>
                 {[
-                  { label: 'This Week', value: `${weekSessions.length} sessions` },
-                  { label: 'Weekly Volume', value: weeklyVolume > 0 ? `${Math.round(weeklyVolume / 100) / 10}k kg` : '—' },
-                  { label: 'Heute', value: isDayRest(todayDay) ? 'Rest Day 😴' : todayTotal > 0 ? `${todayDone}/${todayTotal} done` : '—' },
+                  { label: 'This Week', value: `${weekSessions.length}`, sub: 'sessions' },
+                  { label: 'Volume', value: weeklyVolume > 0 ? `${Math.round(weeklyVolume / 100) / 10}k` : '—', sub: weeklyVolume > 0 ? 'kg' : '' },
+                  { label: 'Heute', value: isDayRest(todayDay) ? '😴' : todayTotal > 0 ? `${todayDone}/${todayTotal}` : '—', sub: isDayRest(todayDay) ? 'Rest Day' : todayTotal > 0 ? 'done' : '' },
                 ].map((s, i) => (
-                  <Card key={s.label} delay={i * 0.07} className="text-center">
-                    <p className="text-chrome-bright text-xl font-semibold font-mono">{s.value}</p>
-                    <SectionLabel>{s.label}</SectionLabel>
-                  </Card>
+                  <motion.div key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
+                    style={{ background: '#0d0d0d', border: '0.5px solid #1a1a1a', borderRadius: 10, padding: '12px 8px', textAlign: 'center', overflow: 'hidden' }}>
+                    <div style={{ fontSize: 8, letterSpacing: '0.12em', color: '#333', textTransform: 'uppercase', marginBottom: 4 }}>{s.label}</div>
+                    <div style={{ fontSize: 22, fontWeight: 500, color: '#c8c8c8', lineHeight: 1.1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.value}</div>
+                    <div style={{ fontSize: 10, color: '#555', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.sub}</div>
+                  </motion.div>
                 ))}
               </div>
 
