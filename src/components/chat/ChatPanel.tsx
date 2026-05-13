@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { MessageSquare, X, Send, Loader2 } from 'lucide-react'
+import { MessageSquare, Send, Loader2, X } from 'lucide-react'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -15,10 +15,13 @@ export function ChatPanel() {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('claude_api_key') || '')
   const [showKeyInput, setShowKeyInput] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const swipeStartY = useRef(0)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  const closeChat = () => setOpen(false)
 
   const saveKey = () => {
     localStorage.setItem('claude_api_key', apiKey)
@@ -69,6 +72,15 @@ export function ChatPanel() {
     }
   }
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    swipeStartY.current = e.touches[0].clientY
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const diff = e.touches[0].clientY - swipeStartY.current
+    if (diff > 80) closeChat()
+  }
+
   return (
     <>
       {/* Trigger button — above bottom nav on mobile */}
@@ -89,7 +101,9 @@ export function ChatPanel() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.98 }}
             transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-            className="fixed inset-x-0 top-0 bottom-16 md:inset-x-auto md:top-auto md:bottom-20 md:right-5 md:w-80 md:h-[480px] z-[200] surface-glass rounded-none md:rounded-2xl flex flex-col overflow-hidden shadow-2xl"
+            className="chat-panel fixed inset-x-0 top-0 bottom-16 md:inset-x-auto md:top-auto md:bottom-20 md:right-5 md:w-80 md:h-[480px] z-[200] surface-glass rounded-none md:rounded-2xl flex flex-col overflow-hidden shadow-2xl"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
           >
             {/* Header */}
             <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
@@ -100,6 +114,26 @@ export function ChatPanel() {
                 className="ml-auto text-chrome-dim hover:text-chrome text-xs font-mono"
               >
                 {apiKey ? 'key ✓' : 'set key'}
+              </button>
+              {/* Close button — visible only on mobile via CSS */}
+              <button
+                onClick={closeChat}
+                className="chat-close-btn ml-2 items-center justify-center"
+                aria-label="Chat schliessen"
+                style={{
+                  display: 'none',
+                  width: 32,
+                  height: 32,
+                  borderRadius: '50%',
+                  background: '#1a1a1a',
+                  border: '0.5px solid #333',
+                  color: '#888',
+                  fontSize: 16,
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                }}
+              >
+                <X size={14} />
               </button>
             </div>
 
@@ -169,7 +203,7 @@ export function ChatPanel() {
             </div>
 
             {/* Input */}
-            <div className="p-3 border-t border-border flex gap-2">
+            <div className="chat-input-row p-3 border-t border-border flex gap-2">
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}

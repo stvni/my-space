@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
+import logo from '../assets/logo.svg'
 
 interface Props { onDone: () => void }
 
@@ -53,16 +54,14 @@ export function IntroScreen({ onDone }: Props) {
         Skip
       </button>
 
-      {/* Dot */}
-      <motion.div
+      {/* Logo */}
+      <motion.img
+        src={logo}
+        alt="My Space"
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.1 }}
-        style={{
-          width: 8, height: 8, borderRadius: '50%',
-          background: '#c8c8c8',
-          boxShadow: '0 0 20px rgba(200,200,200,0.3)',
-        }}
+        style={{ width: 56, height: 56 }}
       />
 
       {/* MY SPACE letters */}

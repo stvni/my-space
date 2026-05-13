@@ -62,7 +62,7 @@ export default function App() {
       >
         <ChromeBackground />
         <Sidebar />
-        <main className="flex-1 relative overflow-hidden" style={{ zIndex: 1 }}>
+        <main className="flex-1 relative overflow-hidden app-content" style={{ zIndex: 1 }}>
           <AnimatedRoutes />
         </main>
         <ChatPanel />

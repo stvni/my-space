@@ -1,5 +1,23 @@
-<svg xmlns='http://www.w3.org/2000/svg' width='192' height='192' viewBox='0 0 192 192'>
-  <rect width='192' height='192' rx='40' fill='%230f0f0f'/>
-  <rect x='1' y='1' width='190' height='190' rx='39' fill='none' stroke='%232a2a2a' stroke-width='2'/>
-  <text x='96' y='118' text-anchor='middle' font-family='Inter, sans-serif' font-size='72' font-weight='700' fill='%23c0c0c0'>MS</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <rect width="180" height="180" fill="#030303" rx="40"/>
+  <polygon
+    points="90,18 153,54 153,126 90,162 27,126 27,54"
+    fill="none"
+    stroke="#b8b8b8"
+    stroke-width="5"
+  />
+  <polygon
+    points="90,38 133,62 133,118 90,142 47,118 47,62"
+    fill="none"
+    stroke="#2a2a2a"
+    stroke-width="2.5"
+  />
+  <text
+    x="90" y="108"
+    text-anchor="middle"
+    font-family="-apple-system, sans-serif"
+    font-size="48"
+    font-weight="500"
+    fill="#c8c8c8"
+  >MS</text>
 </svg>

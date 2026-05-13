@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Safe area CSS variables (Dynamic Island / notch) ── */
+:root {
+  --sat: env(safe-area-inset-top);
+  --sab: env(safe-area-inset-bottom);
+  --sal: env(safe-area-inset-left);
+  --sar: env(safe-area-inset-right);
+}
+
+.top-bar    { padding-top: calc(env(safe-area-inset-top) + 12px); }
+.bottom-nav { padding-bottom: env(safe-area-inset-bottom); }
+.app-content { padding-top: env(safe-area-inset-top); }
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -135,4 +147,46 @@
 
   /* Recharts — prevent overflow */
   .recharts-responsive-container { overflow: hidden; }
+
+  /* ── Chat panel — full screen on mobile ── */
+  .chat-panel {
+    position: fixed !important;
+    inset: 0 !important;
+    top: env(safe-area-inset-top) !important;
+    bottom: 64px !important;
+    border-radius: 0 !important;
+    z-index: 500 !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+  .chat-close-btn { display: flex !important; }
+  .chat-input-row { padding-bottom: 12px !important; }
+
+  /* ── Gym stats ── */
+  .gym-stat-value { font-size: 20px !important; font-weight: 500 !important; }
+  .gym-stat-label { font-size: 9px !important; letter-spacing: 0.1em !important; }
+  .gym-stat-card  { padding: 12px 10px !important; }
+
+  /* ── Food macros ── */
+  .macro-circle       { width: 70px !important; height: 70px !important; }
+  .macro-circle-value { font-size: 14px !important; font-weight: 500 !important; }
+  .macro-circle-label { font-size: 8px !important; }
+  .macro-circles-row  { gap: 8px !important; justify-content: space-between !important; }
+
+  /* ── Health metrics ── */
+  .health-metric-value { font-size: 22px !important; font-weight: 500 !important; }
+  .health-metric-label { font-size: 9px !important; }
+  .health-metric-card  { padding: 12px 10px !important; }
+  .health-metrics-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
+
+  /* ── Skincare ── */
+  .skincare-step         { font-size: 11px !important; padding: 8px 10px !important; }
+  .skincare-day-label    { font-size: 10px !important; }
+  .skincare-section-title{ font-size: 11px !important; letter-spacing: 0.08em !important; }
+  .skincare-grid         { grid-template-columns: 1fr !important; }
+
+  /* ── General ── */
+  .card  { padding: 12px !important; }
+  .section-title { font-size: 11px !important; }
+  .page-title    { font-size: 13px !important; }
 }

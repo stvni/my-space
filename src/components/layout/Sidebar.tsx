@@ -1,4 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
+import logo from '../../assets/logo.svg'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard,
@@ -41,9 +42,7 @@ export function Sidebar() {
       >
         {/* Logo */}
         <div className="flex items-center gap-3 px-4 py-5 border-b border-border">
-          <div className="w-7 h-7 rounded-lg bg-surface2 border border-border flex items-center justify-center shrink-0">
-            <span className="text-chrome-bright text-xs font-bold font-mono">MS</span>
-          </div>
+          <img src={logo} alt="My Space" width={32} height={32} className="shrink-0" />
           <AnimatePresence>
             {!collapsed && (
               <motion.span
@@ -116,12 +115,11 @@ export function Sidebar() {
 
       {/* ── Mobile bottom nav (hidden on desktop) ── */}
       <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 z-[100] flex items-center justify-around"
+        className="bottom-nav md:hidden fixed bottom-0 left-0 right-0 z-[100] flex items-center justify-around"
         style={{
           height: 64,
           background: '#0a0a0a',
           borderTop: '0.5px solid #1a1a1a',
-          paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >
         {NAV.map(({ to, label, icon: Icon, end }) => (
