@@ -78,20 +78,16 @@ export function Sidebar() {
               {({ isActive }) => (
                 <>
                   {isActive && (
-                    <motion.div
-                      layoutId="nav-indicator"
-                      style={{
-                        position: 'absolute',
-                        left: -8,          // flush with sidebar wall (mx-2 = 8px offset)
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        width: 2,
-                        height: 16,
-                        background: '#c8c8c8',
-                        borderRadius: 2,
-                      }}
-                      transition={{ type: 'spring', stiffness: 380, damping: 32 }}
-                    />
+                    <div style={{
+                      position: 'absolute',
+                      left: -8,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      width: 2,
+                      height: 16,
+                      background: '#c8c8c8',
+                      borderRadius: 2,
+                    }} />
                   )}
                   <Icon size={16} className="shrink-0" />
                   <AnimatePresence>

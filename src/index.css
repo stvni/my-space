@@ -89,6 +89,13 @@ input[type="datetime-local"] {
   50% { opacity: 1; transform: scale(1); }
 }
 
+/* Dashboard: 2-column layout on desktop (main + Peak Coach sidebar) */
+@media (min-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 1fr) 280px !important;
+  }
+}
+
 /* react-datepicker dark theme */
 .react-datepicker-popper { z-index: 9999 !important; }
 .react-datepicker {

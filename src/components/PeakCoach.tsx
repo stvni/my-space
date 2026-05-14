@@ -22,8 +22,6 @@ interface PeakCoachProps {
   }
 }
 
-const DOT: React.CSSProperties = { width: 6, height: 6, borderRadius: '50%', flexShrink: 0 }
-
 export function PeakCoach({ progressData }: PeakCoachProps) {
   const [lines, setLines]       = useState<string[]>([])
   const [headline, setHeadline] = useState('')
@@ -35,15 +33,11 @@ export function PeakCoach({ progressData }: PeakCoachProps) {
     setLoading(true)
     setError(false)
 
-    // Rate limit: max 10 fetches per 15 min (protects against loops / accidental spam)
     const limit = checkRateLimit('peak_coach', 10, 15 * 60 * 1000)
     if (!limit.allowed) {
       setError(true)
       setHeadline('Zu viele Anfragen')
-      setLines([
-        `Bitte warte noch ${formatRemainingTime(limit.remainingMs)}.`,
-        'Peak Coach ist auf 10 Anfragen pro 15 Minuten begrenzt.',
-      ])
+      setLines([`Bitte warte noch ${formatRemainingTime(limit.remainingMs)}.`])
       setLoading(false)
       return
     }
@@ -51,11 +45,11 @@ export function PeakCoach({ progressData }: PeakCoachProps) {
     const zurichDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Zurich' }))
     const hour = zurichDate.getHours()
     const timeCtx =
-      hour < 7  ? 'early morning — just woke up, day not started' :
-      hour < 12 ? 'morning — day has started' :
-      hour < 14 ? 'midday — half the day gone' :
-      hour < 18 ? 'afternoon' :
-      hour < 22 ? 'evening — day almost over' : 'late night'
+      hour < 7  ? 'früh morgens — gerade aufgewacht, Tag noch nicht begonnen' :
+      hour < 12 ? 'morgens — Tag hat begonnen' :
+      hour < 14 ? 'mittags — halber Tag vorbei' :
+      hour < 18 ? 'nachmittags' :
+      hour < 22 ? 'abends — Tag fast vorbei' : 'spät nachts'
 
     const {
       gymDone, gymTotal, isRestDay,
@@ -68,9 +62,9 @@ export function PeakCoach({ progressData }: PeakCoachProps) {
       weight,
     } = progressData
 
-    const calPct  = Math.round((calories / Math.max(calorieGoal, 1)) * 100)
-    const waterPct = Math.round((water   / Math.max(waterGoal,   1)) * 100)
-    const gymPct  = isRestDay ? 100 : Math.round((gymDone / Math.max(gymTotal, 1)) * 100)
+    const calPct   = Math.round((calories / Math.max(calorieGoal, 1)) * 100)
+    const waterPct = Math.round((water    / Math.max(waterGoal,   1)) * 100)
+    const gymPct   = isRestDay ? 100 : Math.round((gymDone / Math.max(gymTotal, 1)) * 100)
 
     const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
 
@@ -89,42 +83,42 @@ export function PeakCoach({ progressData }: PeakCoachProps) {
       return
     }
 
-    const systemPrompt = `You are Peak Coach, the personal AI coach of Stefano.
-Profile: 172cm, 49kg, ZHAW Wirtschaftsinformatik student in Switzerland, trains Push/Pull/Legs 5x/week, goal: lean bulk (gain muscle, V-shape).
-Daily targets: ${calorieGoal} kcal, ${proteinGoal}g protein, ${waterGoal}L water, ${sleepGoal}h sleep.
+    const systemPrompt = `Du bist der persönliche Tagescoach von Stefano.
+Profil: 172cm, 49kg, Wirtschaftsinformatik-Student ZHAW Schweiz, trainiert 5x/Woche, Ziel: Masse aufbauen, V-Form.
+Tagesziele: ${calorieGoal} kcal, ${proteinGoal}g Eiweiss, ${waterGoal}L Wasser, ${sleepGoal}h Schlaf.
 
-Output format — respond with EXACTLY this JSON structure, nothing else:
+Ausgabeformat — antworte NUR mit diesem JSON, nichts sonst:
 {
-  "headline": "One sharp, direct sentence (max 10 words). The main message.",
+  "headline": "Ein präziser, direkter Satz (max 12 Wörter). Die Kernaussage.",
   "lines": [
-    "bullet point 1 — specific observation with consequence",
-    "bullet point 2 — specific observation with consequence",
-    "bullet point 3 — specific observation with consequence",
-    "bullet point 4 — actionable priority for right now"
+    "Beobachtung — Konsequenz oder Handlung",
+    "Beobachtung — Konsequenz oder Handlung",
+    "Beobachtung — Konsequenz oder Handlung",
+    "Konkrete Priorität für jetzt"
   ]
 }
 
-Rules:
-- Write in German
-- Be direct and honest — no sugarcoating
-- Reference actual numbers (e.g. "Nur 800 kcal bis jetzt")
-- Morning/low progress: motivate and set focus
-- Midday/low progress: be firm
-- Evening/low progress: be hard but fair
-- High progress (>80%): acknowledge and push to finish
-- Never generic. Always specific to his data.
-- Bullet format: "observation — consequence/action"
-- No emojis in headline. Max 1 emoji per bullet if it adds clarity.`
+Regeln:
+- Schreibe auf Deutsch, kein Englisch
+- Direkt und ehrlich — kein Schönreden
+- Nenne echte Zahlen (z.B. "Erst 800 kcal — fehlen noch 1800")
+- Morgens/wenig erledigt: motivieren, Fokus setzen
+- Mittags/wenig erledigt: klar ansprechen
+- Abends/wenig erledigt: hart aber fair
+- Viel erledigt (>80%): anerkennen, letzten Push geben
+- Keine Anglizismen (nicht: "Lean Bulk", "Push Day" — stattdessen: "Muskelaufbau", "Drücktag")
+- Keine Emojis in der Überschrift
+- Max 1 Emoji pro Stichpunkt wenn sinnvoll`
 
-    const userMsg = `Time: ${timeCtx} (${hour}:00 Zurich)
-Gym: ${gymDone}/${gymTotal} exercises${isRestDay ? ' (Rest Day ✓)' : ''} — ${gymPct}%
-Calories: ${calories}/${calorieGoal} kcal (${calPct}%)
-Protein: ${protein}/${proteinGoal}g
-Water: ${water}/${waterGoal}L (${waterPct}%)
-Sleep last night: ${sleep}h / goal ${sleepGoal}h
-ZHAW todos: ${zhawDone}/${zhawTotal} done
-Skincare: ${skincareDone}/${skincareTotal} steps
-Weight: ${weight}kg`
+    const userMsg = `Zeit: ${timeCtx} (${hour}:00 Zürich)
+Training: ${gymDone}/${gymTotal} Übungen${isRestDay ? ' (Ruhetag ✓)' : ''} — ${gymPct}%
+Kalorien: ${calories}/${calorieGoal} kcal (${calPct}%)
+Eiweiss: ${protein}/${proteinGoal}g
+Wasser: ${water}/${waterGoal}L (${waterPct}%)
+Schlaf letzte Nacht: ${sleep}h / Ziel ${sleepGoal}h
+ZHAW Aufgaben: ${zhawDone}/${zhawTotal} erledigt
+Hautpflege: ${skincareDone}/${skincareTotal} Schritte
+Gewicht: ${weight}kg`
 
     try {
       console.log('[PeakCoach] Sending request to Anthropic...')
@@ -159,15 +153,9 @@ Weight: ${weight}kg`
             'Dann in Vercel: Settings → Environment Variables → aktualisieren.',
             'Danach neu deployen.',
           ],
-          403: [
-            'Zugriff verweigert.',
-            'Prüfe ob der API Key aktiv ist auf console.anthropic.com.',
-          ],
-          429: [
-            'Rate Limit erreicht.',
-            'Bitte 1 Minute warten und dann neu laden.',
-          ],
-          500: ['Anthropic Server Fehler.', 'Bitte später nochmal versuchen.'],
+          403: ['Zugriff verweigert.', 'Prüfe ob der API Key aktiv ist auf console.anthropic.com.'],
+          429: ['Anfrage-Limit erreicht.', 'Bitte 1 Minute warten und dann neu laden.'],
+          500: ['Anthropic Server-Fehler.', 'Bitte später nochmal versuchen.'],
         }
 
         setError(true)
@@ -181,29 +169,25 @@ Weight: ${weight}kg`
       console.log('[PeakCoach] Success, stop_reason:', data.stop_reason)
 
       const text = data.content?.[0]?.text?.trim()
-      if (!text) throw new Error('Empty response from API')
+      if (!text) throw new Error('Leere Antwort von der API')
 
-      let headline = 'Peak Coach'
-      let lines: string[] = [text]
+      let h = 'Tagescoach'
+      let l: string[] = [text]
 
       try {
         const jsonMatch = text.match(/\{[\s\S]*\}/)
         if (jsonMatch) {
           const parsed = JSON.parse(jsonMatch[0])
-          headline = parsed.headline || 'Peak Coach'
-          lines    = Array.isArray(parsed.lines) ? parsed.lines : text.split('\n').filter(Boolean)
+          h = parsed.headline || 'Tagescoach'
+          l = Array.isArray(parsed.lines) ? parsed.lines : text.split('\n').filter(Boolean)
         } else {
-          lines = text.split('\n').filter((l: string) => l.trim())
+          l = text.split('\n').filter((s: string) => s.trim())
         }
-      } catch {
-        /* keep raw text fallback */
-      }
+      } catch { /* keep raw text fallback */ }
 
-      setHeadline(headline)
-      setLines(lines)
-
-      // Cache the result (store fresh values, not stale state)
-      sessionStorage.setItem('peak_coach_msg', JSON.stringify({ headline, lines }))
+      setHeadline(h)
+      setLines(l)
+      sessionStorage.setItem('peak_coach_msg', JSON.stringify({ headline: h, lines: l }))
       sessionStorage.setItem('peak_coach_time', String(Date.now()))
 
     } catch (err) {
@@ -211,33 +195,25 @@ Weight: ${weight}kg`
       setError(true)
       setHeadline('Verbindungsfehler')
       const isNetworkError = err instanceof TypeError && String(err).includes('fetch')
-      setLines(isNetworkError ? [
-        'Netzwerkfehler — keine Verbindung zur API.',
-        'Prüfe deine Internetverbindung.',
-        'Falls das Problem bleibt: API Key in Vercel prüfen.',
-      ] : [
-        String(err).slice(0, 200),
-        'Bitte Seite neu laden.',
-      ])
+      setLines(isNetworkError
+        ? ['Netzwerkfehler — keine Verbindung zur API.', 'Internetverbindung prüfen.']
+        : [String(err).slice(0, 200), 'Bitte Seite neu laden.'])
     }
     setLoading(false)
   }, [progressData])
 
   useEffect(() => {
-    const cached    = sessionStorage.getItem('peak_coach_msg')
-    const cachedTs  = sessionStorage.getItem('peak_coach_time')
-    const CACHE_TTL = 30 * 60 * 1000
-
-    if (cached && cachedTs && Date.now() - parseInt(cachedTs) < CACHE_TTL) {
+    const cached   = sessionStorage.getItem('peak_coach_msg')
+    const cachedTs = sessionStorage.getItem('peak_coach_time')
+    if (cached && cachedTs && Date.now() - parseInt(cachedTs) < 30 * 60 * 1000) {
       try {
-        const parsed = JSON.parse(cached)
-        setHeadline(parsed.headline ?? '')
-        setLines(Array.isArray(parsed.lines) ? parsed.lines : [])
+        const p = JSON.parse(cached)
+        setHeadline(p.headline ?? '')
+        setLines(Array.isArray(p.lines) ? p.lines : [])
         setLoading(false)
         return
-      } catch { /* fall through to fetch */ }
+      } catch { /* fall through */ }
     }
-
     if (hasFetched.current) return
     hasFetched.current = true
     fetchCoachMessage()
@@ -250,44 +226,77 @@ Weight: ${weight}kg`
     fetchCoachMessage()
   }
 
-  if (loading) return (
-    <div style={{ padding: '16px 0', borderTop: '0.5px solid #1a1a1a' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: '#333', letterSpacing: '0.08em' }}>
-        <div style={{ ...DOT, background: '#c8a040', animation: 'pulse 1s ease-in-out infinite' }} />
-        PEAK COACH lädt...
-      </div>
-    </div>
-  )
-
   return (
-    <div style={{ padding: '16px 0', borderTop: '0.5px solid #1a1a1a', maxWidth: 560 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <div style={{ ...DOT, background: error ? '#ef4444' : '#c8a040' }} />
-        <span style={{ fontSize: 9, fontWeight: 500, letterSpacing: '0.18em', color: '#555', textTransform: 'uppercase' }}>
-          Peak Coach
-        </span>
-        <button onClick={refresh}
-          style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', color: '#333', fontSize: 13 }}
-          aria-label="Aktualisieren">↻</button>
+    <div style={{
+      background: '#0a0a0a',
+      border: '0.5px solid #1e1e1e',
+      borderRadius: 12,
+      padding: 16,
+      width: '100%',
+    }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{
+            width: 5, height: 5, borderRadius: '50%', flexShrink: 0,
+            background: loading ? '#333' : error ? '#ef4444' : '#c8a040',
+          }} />
+          <span style={{ fontSize: 8, fontWeight: 500, letterSpacing: '0.18em', color: '#444', textTransform: 'uppercase' }}>
+            Tagescoach
+          </span>
+        </div>
+        <button
+          onClick={refresh}
+          style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#333', fontSize: 12, padding: 4 }}
+          onMouseEnter={e => (e.currentTarget.style.color = '#888')}
+          onMouseLeave={e => (e.currentTarget.style.color = '#333')}
+          aria-label="Aktualisieren"
+        >↻</button>
       </div>
 
-      <div style={{ fontSize: 15, fontWeight: 500, color: '#d0d0d0', lineHeight: 1.4, marginBottom: 12 }}>
-        {headline}
-      </div>
+      {/* Loading dots */}
+      {loading && (
+        <div style={{ display: 'flex', gap: 4, padding: '6px 0' }}>
+          {[0, 1, 2].map(i => (
+            <div key={i} style={{
+              width: 3, height: 3, borderRadius: '50%', background: '#2a2a2a',
+              animation: `pulse 1.2s ease-in-out ${i * 0.15}s infinite`,
+            }} />
+          ))}
+        </div>
+      )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {lines.map((line, i) => {
-          const isGood    = line.startsWith('✓') || line.startsWith('✅')
-          const isWarning = !isGood && (line.includes('!') || /zu wenig|fehlt|nicht|kein/i.test(line))
-          const dotColor  = isGood ? '#4ade80' : isWarning ? '#f59e0b' : '#444'
-          return (
-            <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <div style={{ ...DOT, background: dotColor, marginTop: 6 }} />
-              <span style={{ fontSize: 12, color: '#888', lineHeight: 1.6 }}>{line}</span>
-            </div>
-          )
-        })}
-      </div>
+      {/* Content */}
+      {!loading && (
+        <>
+          <div style={{
+            fontSize: 12, fontWeight: 500, color: '#c8c8c8',
+            lineHeight: 1.5, marginBottom: 10, paddingBottom: 10,
+            borderBottom: '0.5px solid #1a1a1a',
+          }}>
+            {headline}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            {lines.map((line, i) => {
+              const isGood = line.startsWith('✓') || line.startsWith('✅') ||
+                /gut|stark|super|top|erledigt/i.test(line)
+              const isWarn = !isGood && (line.includes('!') ||
+                /zu wenig|fehlt|nicht|kein|erst|nur/i.test(line))
+              const dotColor = isGood ? '#4ade80' : isWarn ? '#f59e0b' : '#2a2a2a'
+              return (
+                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                  <div style={{
+                    width: 3, height: 3, borderRadius: '50%',
+                    background: dotColor, flexShrink: 0, marginTop: 5,
+                  }} />
+                  <span style={{ fontSize: 11, color: '#555', lineHeight: 1.6 }}>{line}</span>
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
     </div>
   )
 }
