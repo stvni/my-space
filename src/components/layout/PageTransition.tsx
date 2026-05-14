@@ -19,7 +19,8 @@ export function PageTransition({ children }: { children: ReactNode }) {
         opacity: 0, x: xOut, scale: 1.005, filter: 'blur(4px)',
         transition: { duration: 0.2, ease: [0.7, 0, 1, 0.4] as [number, number, number, number] },
       }}
-      className="h-full w-full overflow-y-auto pb-20 md:pb-0"
+      className="h-full w-full overflow-y-auto app-scroll-area"
+      style={{ paddingBottom: 'calc(64px + env(safe-area-inset-bottom) + 8px)' }}
     >
       {children}
     </motion.div>

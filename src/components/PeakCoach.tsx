@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { checkRateLimit, formatRemainingTime } from '../utils/rateLimiter'
+import { createDataHash, getCachedCoach, setCachedCoach, clearCoachCache } from '../utils/peakCoachCache'
 
 interface PeakCoachProps {
   progressData: {
@@ -22,17 +23,76 @@ interface PeakCoachProps {
   }
 }
 
+// ── Color classification ──────────────────────────────────────────────────────
+type LineType = 'red' | 'orange' | 'green' | 'white'
+
+function classifyLine(line: string): LineType {
+  const l = line.toLowerCase()
+
+  const redKw = [
+    'totalausfall', 'katastrophe', 'kritisch', 'notfall', 'nicht gemacht',
+    'komplett vergessen', 'gefährlich', 'schlafen ist nicht optional',
+    'ausfall', 'hungert', 'stoppt', '0 kcal', '0g', '0l', '0h schlaf',
+  ]
+  const greenKw = [
+    'gut gemacht', 'stark', 'erreicht', 'erledigt', 'abgeschlossen',
+    'vollständig', 'perfekt', 'ausgezeichnet', 'weiter so',
+    'ziel erreicht', 'super', 'klasse', 'sehr gut', 'trainiert',
+    'geschafft', 'positiv',
+  ]
+  const orangeKw = [
+    'zu wenig', 'fehlt noch', 'nicht genug', 'knapp', 'fast', 'noch nicht',
+    'ausstehend', 'achtung', 'aufpassen', 'beachten', 'solltest', 'fehlt',
+    'erst ', 'nur ', 'wäre besser', 'könnte mehr', 'nicht ', 'kein ',
+  ]
+
+  if (redKw.some(k => l.includes(k)))    return 'red'
+  if (greenKw.some(k => l.includes(k)))  return 'green'
+  if (orangeKw.some(k => l.includes(k))) return 'orange'
+  return 'white'
+}
+
+const COLOR_MAP: Record<LineType, { dot: string; text: string }> = {
+  red:    { dot: '#ef4444', text: '#888' },
+  orange: { dot: '#f59e0b', text: '#888' },
+  green:  { dot: '#4ade80', text: '#888' },
+  white:  { dot: '#3a3a3a', text: '#666' },
+}
+
+// ── Component ────────────────────────────────────────────────────────────────
 export function PeakCoach({ progressData }: PeakCoachProps) {
   const [lines, setLines]       = useState<string[]>([])
   const [headline, setHeadline] = useState('')
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState(false)
-  const hasFetched              = useRef(false)
+  const prevHashRef             = useRef('')
 
-  const fetchCoachMessage = useCallback(async () => {
+  const fetchCoachMessage = useCallback(async (forceRefresh = false) => {
     setLoading(true)
     setError(false)
 
+    const currentHash = createDataHash({
+      calories: progressData.calories,
+      protein:  progressData.protein,
+      water:    progressData.water,
+      sleep:    progressData.sleep,
+      gymDone:  progressData.gymDone,
+      gymTotal: progressData.gymTotal,
+      zhawDone: progressData.zhawDone,
+    })
+
+    // Serve from cache unless forced or data changed
+    if (!forceRefresh) {
+      const cached = getCachedCoach(currentHash)
+      if (cached) {
+        setHeadline(cached.headline)
+        setLines(cached.lines)
+        setLoading(false)
+        return
+      }
+    }
+
+    // Rate limit: 10 requests / 15 min
     const limit = checkRateLimit('peak_coach', 10, 15 * 60 * 1000)
     if (!limit.allowed) {
       setError(true)
@@ -140,7 +200,6 @@ Gewicht: ${weight}kg`
       })
 
       console.log('[PeakCoach] Response status:', res.status)
-      console.log('[PeakCoach] Response ok:', res.ok)
 
       if (!res.ok) {
         const errorBody = await res.text()
@@ -153,7 +212,7 @@ Gewicht: ${weight}kg`
             'Dann in Vercel: Settings → Environment Variables → aktualisieren.',
             'Danach neu deployen.',
           ],
-          403: ['Zugriff verweigert.', 'Prüfe ob der API Key aktiv ist auf console.anthropic.com.'],
+          403: ['Zugriff verweigert.', 'API Key auf console.anthropic.com prüfen.'],
           429: ['Anfrage-Limit erreicht.', 'Bitte 1 Minute warten und dann neu laden.'],
           500: ['Anthropic Server-Fehler.', 'Bitte später nochmal versuchen.'],
         }
@@ -183,12 +242,11 @@ Gewicht: ${weight}kg`
         } else {
           l = text.split('\n').filter((s: string) => s.trim())
         }
-      } catch { /* keep raw text fallback */ }
+      } catch { /* keep raw text */ }
 
       setHeadline(h)
       setLines(l)
-      sessionStorage.setItem('peak_coach_msg', JSON.stringify({ headline: h, lines: l }))
-      sessionStorage.setItem('peak_coach_time', String(Date.now()))
+      setCachedCoach(h, l, currentHash)
 
     } catch (err) {
       console.error('[PeakCoach] Exception:', err)
@@ -202,40 +260,47 @@ Gewicht: ${weight}kg`
     setLoading(false)
   }, [progressData])
 
+  // Re-fetch only when significant data changes (rounded buckets)
   useEffect(() => {
-    const cached   = sessionStorage.getItem('peak_coach_msg')
-    const cachedTs = sessionStorage.getItem('peak_coach_time')
-    if (cached && cachedTs && Date.now() - parseInt(cachedTs) < 30 * 60 * 1000) {
-      try {
-        const p = JSON.parse(cached)
-        setHeadline(p.headline ?? '')
-        setLines(Array.isArray(p.lines) ? p.lines : [])
-        setLoading(false)
-        return
-      } catch { /* fall through */ }
+    const newHash = createDataHash({
+      calories: progressData.calories  ?? 0,
+      protein:  progressData.protein   ?? 0,
+      water:    progressData.water     ?? 0,
+      sleep:    progressData.sleep     ?? 0,
+      gymDone:  progressData.gymDone   ?? 0,
+      gymTotal: progressData.gymTotal  ?? 0,
+      zhawDone: progressData.zhawDone  ?? 0,
+    })
+    if (newHash !== prevHashRef.current) {
+      prevHashRef.current = newHash
+      fetchCoachMessage(false)
     }
-    if (hasFetched.current) return
-    hasFetched.current = true
-    fetchCoachMessage()
-  }, [])
+  }, [
+    Math.round((progressData.calories ?? 0) / 200),
+    Math.round((progressData.protein  ?? 0) / 20),
+    Math.round((progressData.water    ?? 0) / 0.5),
+    Math.round(progressData.sleep     ?? 0),
+    progressData.gymDone,
+    progressData.zhawDone,
+  ])
 
-  const refresh = () => {
-    sessionStorage.removeItem('peak_coach_msg')
-    sessionStorage.removeItem('peak_coach_time')
-    hasFetched.current = false
-    fetchCoachMessage()
+  const handleManualRefresh = () => {
+    clearCoachCache()
+    prevHashRef.current = ''
+    fetchCoachMessage(true)
   }
 
   return (
-    <div style={{
+    <div className="peak-coach-card" style={{
       background: '#0a0a0a',
       border: '0.5px solid #1e1e1e',
       borderRadius: 12,
-      padding: 16,
+      padding: '14px 16px',
       width: '100%',
+      boxSizing: 'border-box',
     }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div style={{
             width: 5, height: 5, borderRadius: '50%', flexShrink: 0,
@@ -246,7 +311,7 @@ Gewicht: ${weight}kg`
           </span>
         </div>
         <button
-          onClick={refresh}
+          onClick={handleManualRefresh}
           style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#333', fontSize: 12, padding: 4 }}
           onMouseEnter={e => (e.currentTarget.style.color = '#888')}
           onMouseLeave={e => (e.currentTarget.style.color = '#333')}
@@ -269,31 +334,55 @@ Gewicht: ${weight}kg`
       {/* Content */}
       {!loading && (
         <>
-          <div style={{
-            fontSize: 12, fontWeight: 500, color: '#c8c8c8',
+          {/* Headline */}
+          <div className="peak-coach-headline" style={{
+            fontSize: 13, fontWeight: 500, color: '#c8c8c8',
             lineHeight: 1.5, marginBottom: 10, paddingBottom: 10,
             borderBottom: '0.5px solid #1a1a1a',
           }}>
             {headline}
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+          {/* Bullets — 2-col on desktop, 1-col on mobile */}
+          <div className="peak-coach-bullets" style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+            gap: '6px 20px',
+          }}>
             {lines.map((line, i) => {
-              const isGood = line.startsWith('✓') || line.startsWith('✅') ||
-                /gut|stark|super|top|erledigt/i.test(line)
-              const isWarn = !isGood && (line.includes('!') ||
-                /zu wenig|fehlt|nicht|kein|erst|nur/i.test(line))
-              const dotColor = isGood ? '#4ade80' : isWarn ? '#f59e0b' : '#2a2a2a'
+              const type   = classifyLine(line)
+              const colors = COLOR_MAP[type]
               return (
                 <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                   <div style={{
-                    width: 3, height: 3, borderRadius: '50%',
-                    background: dotColor, flexShrink: 0, marginTop: 5,
+                    width: 4, height: 4, borderRadius: '50%',
+                    background: colors.dot, flexShrink: 0, marginTop: 5,
+                    boxShadow: type !== 'white' ? `0 0 4px ${colors.dot}55` : 'none',
                   }} />
-                  <span style={{ fontSize: 11, color: '#555', lineHeight: 1.6 }}>{line}</span>
+                  <span className="peak-coach-line" style={{ fontSize: 11, color: colors.text, lineHeight: 1.6 }}>
+                    {line}
+                  </span>
                 </div>
               )
             })}
+          </div>
+
+          {/* Color legend */}
+          <div className="peak-coach-legend" style={{
+            display: 'flex', gap: 14, marginTop: 10,
+            paddingTop: 8, borderTop: '0.5px solid #141414',
+          }}>
+            {([
+              ['#4ade80', 'Positiv'],
+              ['#f59e0b', 'Mittel'],
+              ['#ef4444', 'Dringend'],
+              ['#3a3a3a', 'Info'],
+            ] as const).map(([color, label]) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ width: 4, height: 4, borderRadius: '50%', background: color }} />
+                <span style={{ fontSize: 8, color: '#2a2a2a', letterSpacing: '0.08em' }}>{label}</span>
+              </div>
+            ))}
           </div>
         </>
       )}

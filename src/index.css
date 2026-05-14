@@ -89,11 +89,11 @@ input[type="datetime-local"] {
   50% { opacity: 1; transform: scale(1); }
 }
 
-/* Dashboard: 2-column layout on desktop (main + Peak Coach sidebar) */
+/* Peak Coach — 2-col bullets on desktop (already set inline; override for mobile below) */
+
+/* Desktop: remove mobile bottom padding from scroll area */
 @media (min-width: 768px) {
-  .dashboard-grid {
-    grid-template-columns: minmax(0, 1fr) 280px !important;
-  }
+  .app-scroll-area { padding-bottom: 0 !important; }
 }
 
 /* react-datepicker dark theme */
@@ -221,4 +221,16 @@ input[type="datetime-local"] {
   .card  { padding: 12px !important; }
   .section-title { font-size: 11px !important; }
   .page-title    { font-size: 13px !important; }
+
+  /* ── Peak Coach ── */
+  .peak-coach-card    { padding: 12px 14px !important; }
+  .peak-coach-bullets { grid-template-columns: 1fr !important; }
+  .peak-coach-legend  { display: none !important; }
+  .peak-coach-line    { font-size: 10px !important; }
+  .peak-coach-headline{ font-size: 12px !important; }
+
+  /* ── Dashboard stat rings ── */
+  .stat-cards-grid { gap: 8px !important; }
+
+  /* (app-scroll-area padding already set inline in PageTransition for mobile) */
 }
