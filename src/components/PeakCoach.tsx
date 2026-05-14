@@ -73,15 +73,17 @@ export function PeakCoach({ progressData }: PeakCoachProps) {
     const gymPct  = isRestDay ? 100 : Math.round((gymDone / Math.max(gymTotal, 1)) * 100)
 
     const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
-    console.log('[PeakCoach] API Key present:', !!apiKey)
-    console.log('[PeakCoach] API Key prefix:', apiKey?.slice(0, 10))
 
-    if (!apiKey) {
-      setHeadline('Kein API Key gefunden')
+    console.log('[PeakCoach] Starting fetch...')
+    console.log('[PeakCoach] API key exists:', !!apiKey)
+    console.log('[PeakCoach] API key starts with:', apiKey?.substring(0, 14))
+
+    if (!apiKey || apiKey.trim() === '') {
+      setHeadline('API Key fehlt')
       setLines([
-        'VITE_ANTHROPIC_API_KEY fehlt in den Environment Variables.',
+        'VITE_ANTHROPIC_API_KEY ist nicht gesetzt.',
         'In Vercel: Settings → Environment Variables → hinzufügen.',
-        'Dann neu deployen.',
+        'Danach: Vercel Dashboard → Redeploy.',
       ])
       setLoading(false)
       return
@@ -125,11 +127,13 @@ Skincare: ${skincareDone}/${skincareTotal} steps
 Weight: ${weight}kg`
 
     try {
+      console.log('[PeakCoach] Sending request to Anthropic...')
+
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': apiKey,
+          'x-api-key': apiKey.trim(),
           'anthropic-version': '2023-06-01',
           'anthropic-dangerous-direct-browser-access': 'true',
         },
@@ -142,43 +146,79 @@ Weight: ${weight}kg`
       })
 
       console.log('[PeakCoach] Response status:', res.status)
+      console.log('[PeakCoach] Response ok:', res.ok)
 
       if (!res.ok) {
-        const errText = await res.text()
-        console.error('[PeakCoach] API Error:', errText)
+        const errorBody = await res.text()
+        console.error('[PeakCoach] Error body:', errorBody)
+
+        const errorMessages: Record<number, string[]> = {
+          401: [
+            'API Key ungültig oder abgelaufen.',
+            'Gehe zu console.anthropic.com → API Keys → neuen Key erstellen.',
+            'Dann in Vercel: Settings → Environment Variables → aktualisieren.',
+            'Danach neu deployen.',
+          ],
+          403: [
+            'Zugriff verweigert.',
+            'Prüfe ob der API Key aktiv ist auf console.anthropic.com.',
+          ],
+          429: [
+            'Rate Limit erreicht.',
+            'Bitte 1 Minute warten und dann neu laden.',
+          ],
+          500: ['Anthropic Server Fehler.', 'Bitte später nochmal versuchen.'],
+        }
+
         setError(true)
-        setHeadline('API Fehler ' + res.status)
-        setLines([errText.slice(0, 120)])
+        setHeadline(`Fehler ${res.status}`)
+        setLines(errorMessages[res.status] ?? [`HTTP Fehler ${res.status}`, errorBody.slice(0, 150)])
         setLoading(false)
         return
       }
 
       const data = await res.json()
-      console.log('[PeakCoach] Response received, stop_reason:', data.stop_reason)
+      console.log('[PeakCoach] Success, stop_reason:', data.stop_reason)
 
       const text = data.content?.[0]?.text?.trim()
       if (!text) throw new Error('Empty response from API')
 
-      const jsonMatch = text.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) {
-        // Fallback: display raw text if JSON parsing fails
-        setHeadline('Peak Coach')
-        setLines([text])
-        setLoading(false)
-        return
+      let headline = 'Peak Coach'
+      let lines: string[] = [text]
+
+      try {
+        const jsonMatch = text.match(/\{[\s\S]*\}/)
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0])
+          headline = parsed.headline || 'Peak Coach'
+          lines    = Array.isArray(parsed.lines) ? parsed.lines : text.split('\n').filter(Boolean)
+        } else {
+          lines = text.split('\n').filter((l: string) => l.trim())
+        }
+      } catch {
+        /* keep raw text fallback */
       }
 
-      const parsed = JSON.parse(jsonMatch[0])
-      setHeadline(parsed.headline ?? 'Peak Coach')
-      setLines(Array.isArray(parsed.lines) ? parsed.lines : [text])
+      setHeadline(headline)
+      setLines(lines)
 
-      sessionStorage.setItem('peak_coach_msg', JSON.stringify(parsed))
+      // Cache the result (store fresh values, not stale state)
+      sessionStorage.setItem('peak_coach_msg', JSON.stringify({ headline, lines }))
       sessionStorage.setItem('peak_coach_time', String(Date.now()))
-    } catch (e) {
-      console.error('[PeakCoach] Exception:', e)
+
+    } catch (err) {
+      console.error('[PeakCoach] Exception:', err)
       setError(true)
       setHeadline('Verbindungsfehler')
-      setLines([String(e)])
+      const isNetworkError = err instanceof TypeError && String(err).includes('fetch')
+      setLines(isNetworkError ? [
+        'Netzwerkfehler — keine Verbindung zur API.',
+        'Prüfe deine Internetverbindung.',
+        'Falls das Problem bleibt: API Key in Vercel prüfen.',
+      ] : [
+        String(err).slice(0, 200),
+        'Bitte Seite neu laden.',
+      ])
     }
     setLoading(false)
   }, [progressData])

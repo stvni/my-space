@@ -80,7 +80,16 @@ export function Sidebar() {
                   {isActive && (
                     <motion.div
                       layoutId="nav-indicator"
-                      className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-chrome-bright rounded-full"
+                      style={{
+                        position: 'absolute',
+                        left: -8,          // flush with sidebar wall (mx-2 = 8px offset)
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        width: 2,
+                        height: 16,
+                        background: '#c8c8c8',
+                        borderRadius: 2,
+                      }}
                       transition={{ type: 'spring', stiffness: 380, damping: 32 }}
                     />
                   )}
