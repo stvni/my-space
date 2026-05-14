@@ -3,9 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Check } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
 } from 'recharts'
 import { db } from '../../db/db'
+import { toSwissDate } from '../../utils/dateFormat'
 import { PageTransition } from '../../components/layout/PageTransition'
 import { Card, SectionLabel } from '../../components/ui/Card'
 import { RingWidget } from '../../components/ui/RingWidget'
@@ -254,27 +255,57 @@ export function Skincare() {
                 </Card>
               ) : (
                 <>
-                  {/* Graph */}
-                  <div style={{ marginBottom: 24 }}>
-                    <div style={{ fontSize: 9, color: '#333', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>
-                      Routine-Erfüllung (letzte 21 Tage)
-                    </div>
-                    <ResponsiveContainer width="100%" height={140}>
-                      <BarChart data={chartData} barGap={2} barSize={8} margin={{ top: 8, right: 0, left: -20, bottom: 0 }}>
-                        <XAxis dataKey="date" tick={{ fill: '#333', fontSize: 9 }} axisLine={false} tickLine={false} />
-                        <YAxis tick={{ fill: '#333', fontSize: 9 }} axisLine={false} tickLine={false}
+                  {/* Morning chart */}
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ fontSize: 9, color: '#333', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>Morgen-Routine (letzte 21 Tage)</div>
+                    <ResponsiveContainer width="100%" height={120}>
+                      <BarChart data={chartData} barSize={8} margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" vertical={false} />
+                        <XAxis dataKey="date" tick={{ fill: '#444', fontSize: 8 }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fill: '#555', fontSize: 9 }} axisLine={false} tickLine={false}
                           domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} />
                         <Tooltip
-                          contentStyle={{ background: '#0d0d0d', border: '0.5px solid #252525', borderRadius: 8, fontSize: 10 }}
-                          labelStyle={{ color: '#c8c8c8' }}
-                          formatter={(v, name) => [`${v ?? 0}%`, String(name) === 'morningPct' ? 'Morgens' : 'Abends']}
+                          contentStyle={{ background: '#0d0d0d', border: '0.5px solid #252525', borderRadius: 8, fontSize: 11, color: '#c8c8c8', boxShadow: 'none' }}
+                          labelStyle={{ color: '#888', fontSize: 10 }}
+                          cursor={{ stroke: '#2a2a2a', strokeWidth: 1 }}
+                          formatter={(v) => [`${v ?? 0}%`, 'Morgens']}
                         />
-                        <Bar dataKey="morningPct" fill="rgba(200,200,200,0.5)" radius={[3, 3, 0, 0]} />
-                        <Bar dataKey="eveningPct" fill="rgba(120,120,120,0.3)" radius={[3, 3, 0, 0]} />
+                        <Bar dataKey="morningPct" radius={[3, 3, 0, 0]}>
+                          {chartData.map((d, i) => (
+                            <Cell key={i} fill={d.morningPct === 100 ? 'rgba(249,115,22,0.45)' : d.morningPct >= 75 ? 'rgba(249,115,22,0.25)' : 'rgba(107,114,128,0.2)'} />
+                          ))}
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
-                    <div style={{ display: 'flex', gap: 16, padding: '6px 0', borderBottom: '0.5px solid #1a1a1a' }}>
-                      {([['rgba(200,200,200,0.5)', 'Morgens'], ['rgba(120,120,120,0.3)', 'Abends']] as const).map(([c, l]) => (
+                  </div>
+
+                  {/* Evening chart */}
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ fontSize: 9, color: '#333', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>Abend-Routine (letzte 21 Tage)</div>
+                    <ResponsiveContainer width="100%" height={120}>
+                      <BarChart data={chartData} barSize={8} margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" vertical={false} />
+                        <XAxis dataKey="date" tick={{ fill: '#444', fontSize: 8 }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fill: '#555', fontSize: 9 }} axisLine={false} tickLine={false}
+                          domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} />
+                        <Tooltip
+                          contentStyle={{ background: '#0d0d0d', border: '0.5px solid #252525', borderRadius: 8, fontSize: 11, color: '#c8c8c8', boxShadow: 'none' }}
+                          labelStyle={{ color: '#888', fontSize: 10 }}
+                          cursor={{ stroke: '#2a2a2a', strokeWidth: 1 }}
+                          formatter={(v) => [`${v ?? 0}%`, 'Abends']}
+                        />
+                        <Bar dataKey="eveningPct" radius={[3, 3, 0, 0]}>
+                          {chartData.map((d, i) => (
+                            <Cell key={i} fill={d.eveningPct === 100 ? 'rgba(139,92,246,0.45)' : d.eveningPct >= 75 ? 'rgba(139,92,246,0.25)' : 'rgba(107,114,128,0.2)'} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                    <div style={{ display: 'flex', gap: 16, padding: '6px 0 0' }}>
+                      {([
+                        ['rgba(249,115,22,0.55)', 'Morgens'],
+                        ['rgba(139,92,246,0.55)', 'Abends'],
+                      ] as const).map(([c, l]) => (
                         <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                           <div style={{ width: 8, height: 8, borderRadius: 2, background: c }} />
                           <span style={{ fontSize: 9, color: '#444' }}>{l}</span>
@@ -291,7 +322,7 @@ export function Skincare() {
                       return (
                         <div key={l.id} style={{ background: '#0a0a0a', border: '0.5px solid #1a1a1a', borderRadius: 9, padding: '10px 14px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span style={{ fontSize: 11, color: '#555', fontFamily: 'monospace' }}>{l.date}</span>
+                            <span style={{ fontSize: 11, color: '#555', fontFamily: 'monospace' }}>{toSwissDate(l.date)}</span>
                             <div style={{ display: 'flex', gap: 14 }}>
                               <span style={{ fontSize: 11, color: amPct === 100 ? '#f97316' : '#444' }}>AM {amPct}%</span>
                               <span style={{ fontSize: 11, color: pmPct === 100 ? '#8b5cf6' : '#444' }}>PM {pmPct}%</span>
