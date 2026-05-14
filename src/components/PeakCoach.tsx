@@ -59,9 +59,16 @@ export function PeakCoach({ progressData }: PeakCoachProps) {
     const gymPct  = isRestDay ? 100 : Math.round((gymDone / Math.max(gymTotal, 1)) * 100)
 
     const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
+    console.log('[PeakCoach] API Key present:', !!apiKey)
+    console.log('[PeakCoach] API Key prefix:', apiKey?.slice(0, 10))
+
     if (!apiKey) {
-      setHeadline('API Key nicht konfiguriert')
-      setLines(['Bitte VITE_ANTHROPIC_API_KEY in Vercel Environment Variables eintragen.'])
+      setHeadline('Kein API Key gefunden')
+      setLines([
+        'VITE_ANTHROPIC_API_KEY fehlt in den Environment Variables.',
+        'In Vercel: Settings → Environment Variables → hinzufügen.',
+        'Dann neu deployen.',
+      ])
       setLoading(false)
       return
     }
@@ -120,24 +127,44 @@ Weight: ${weight}kg`
         }),
       })
 
-      if (!res.ok) throw new Error(`API ${res.status}`)
+      console.log('[PeakCoach] Response status:', res.status)
+
+      if (!res.ok) {
+        const errText = await res.text()
+        console.error('[PeakCoach] API Error:', errText)
+        setError(true)
+        setHeadline('API Fehler ' + res.status)
+        setLines([errText.slice(0, 120)])
+        setLoading(false)
+        return
+      }
 
       const data = await res.json()
-      const text = data.content[0].text.trim()
+      console.log('[PeakCoach] Response received, stop_reason:', data.stop_reason)
+
+      const text = data.content?.[0]?.text?.trim()
+      if (!text) throw new Error('Empty response from API')
+
       const jsonMatch = text.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) throw new Error('No JSON in response')
+      if (!jsonMatch) {
+        // Fallback: display raw text if JSON parsing fails
+        setHeadline('Peak Coach')
+        setLines([text])
+        setLoading(false)
+        return
+      }
 
       const parsed = JSON.parse(jsonMatch[0])
-      setHeadline(parsed.headline ?? '')
-      setLines(Array.isArray(parsed.lines) ? parsed.lines : [])
+      setHeadline(parsed.headline ?? 'Peak Coach')
+      setLines(Array.isArray(parsed.lines) ? parsed.lines : [text])
 
       sessionStorage.setItem('peak_coach_msg', JSON.stringify(parsed))
       sessionStorage.setItem('peak_coach_time', String(Date.now()))
     } catch (e) {
-      console.error('PeakCoach error:', e)
+      console.error('[PeakCoach] Exception:', e)
       setError(true)
       setHeadline('Verbindungsfehler')
-      setLines(['Bitte Seite neu laden oder API Key prüfen.'])
+      setLines([String(e)])
     }
     setLoading(false)
   }, [progressData])

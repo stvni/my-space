@@ -3,6 +3,20 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: (id: string) => {
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) return 'vendor'
+          if (id.includes('node_modules/framer-motion'))   return 'motion'
+          if (id.includes('node_modules/recharts'))        return 'charts'
+          if (id.includes('node_modules/dexie'))           return 'db'
+          if (id.includes('node_modules/@remotion'))       return 'remotion'
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({
