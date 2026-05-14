@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MessageSquare, Send, Loader2, X } from 'lucide-react'
+import { checkRateLimit, formatRemainingTime } from '../../utils/rateLimiter'
+import { sanitizeForAI } from '../../utils/sanitize'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -32,7 +34,18 @@ export function ChatPanel() {
     if (!input.trim() || loading) return
     if (!apiKey) { setShowKeyInput(true); return }
 
-    const userMsg: Message = { role: 'user', content: input.trim() }
+    // Rate limit: 20 messages per 15 min
+    const limit = checkRateLimit('claude_chat', 20, 15 * 60 * 1000)
+    if (!limit.allowed) {
+      setMessages((m) => [...m, {
+        role: 'assistant',
+        content: `⚠️ Limit erreicht. Bitte ${formatRemainingTime(limit.remainingMs)} warten.`,
+      }])
+      return
+    }
+
+    const safeContent = sanitizeForAI(input.trim())
+    const userMsg: Message = { role: 'user', content: safeContent }
     setMessages((m) => [...m, userMsg])
     setInput('')
     setLoading(true)

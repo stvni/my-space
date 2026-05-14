@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { checkRateLimit, formatRemainingTime } from '../utils/rateLimiter'
 
 interface PeakCoachProps {
   progressData: {
@@ -33,6 +34,19 @@ export function PeakCoach({ progressData }: PeakCoachProps) {
   const fetchCoachMessage = useCallback(async () => {
     setLoading(true)
     setError(false)
+
+    // Rate limit: max 10 fetches per 15 min (protects against loops / accidental spam)
+    const limit = checkRateLimit('peak_coach', 10, 15 * 60 * 1000)
+    if (!limit.allowed) {
+      setError(true)
+      setHeadline('Zu viele Anfragen')
+      setLines([
+        `Bitte warte noch ${formatRemainingTime(limit.remainingMs)}.`,
+        'Peak Coach ist auf 10 Anfragen pro 15 Minuten begrenzt.',
+      ])
+      setLoading(false)
+      return
+    }
 
     const zurichDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Zurich' }))
     const hour = zurichDate.getHours()
