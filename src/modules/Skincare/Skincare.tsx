@@ -110,6 +110,22 @@ export function Skincare() {
     await saveToDB(newAM, newPM)
   }
 
+  const allAMDone = amSteps.length > 0 && doneAM.size === amSteps.length
+  const allPMDone = pmSteps.length > 0 && donePM.size === pmSteps.length
+
+  const markAllRoutineDone = async (r: 'am' | 'pm') => {
+    const stps = r === 'am' ? amSteps : pmSteps
+    const all = new Set(stps.map((_, i) => i))
+    localStorage.setItem(getDoneKey(r), JSON.stringify([...all]))
+    if (r === 'am') {
+      setDoneAM(all)
+      await saveToDB(all, donePM)
+    } else {
+      setDonePM(all)
+      await saveToDB(doneAM, all)
+    }
+  }
+
   const doneCount = done.size
 
   // Verlauf chart data
@@ -162,8 +178,37 @@ export function Skincare() {
               <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-4">
                 <div className="space-y-4">
                   <Card>
-                    <SectionLabel>{routine === 'am' ? 'Morning Routine' : 'Evening Routine'}</SectionLabel>
-                    <div className="mt-3 space-y-2">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <SectionLabel>{routine === 'am' ? 'Morning Routine' : 'Evening Routine'}</SectionLabel>
+                      {(routine === 'am' ? allAMDone : allPMDone) ? (
+                        <div style={{ fontSize: 9, color: '#4ade80', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <Check size={10} />
+                          Fertig
+                        </div>
+                      ) : (
+                        <motion.button
+                          className="all-done-btn"
+                          whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                          onClick={() => markAllRoutineDone(routine)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 5,
+                            padding: '5px 12px',
+                            border: '0.5px solid rgba(74,222,128,0.35)',
+                            borderRadius: 7,
+                            background: 'rgba(74,222,128,0.05)',
+                            color: '#4ade80',
+                            fontSize: 9, fontWeight: 500,
+                            letterSpacing: '0.08em',
+                            cursor: 'pointer',
+                            textTransform: 'uppercase' as const,
+                          }}
+                        >
+                          <Check size={11} />
+                          Alle erledigt
+                        </motion.button>
+                      )}
+                    </div>
+                    <div className="space-y-2">
                       {steps.map((step, i) => (
                         <motion.div key={step} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: i * 0.05 }} className="flex items-center gap-3">

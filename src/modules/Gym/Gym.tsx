@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, X, Dumbbell, Trash2, History, Pencil, Check, BookOpen, ImageOff, Moon, Zap } from 'lucide-react'
+import { Plus, X, Dumbbell, Trash2, History, Pencil, Check, CheckCheck, BookOpen, ImageOff, Moon, Zap } from 'lucide-react'
 import {
   db, type GymPlanDay, type GymPlanSection, type Exercise,
   type WorkoutExercise, getTodayDay, getTodayPlanIndex, seedExerciseLibrary,
@@ -35,6 +35,7 @@ export function Gym() {
   const [newExInputs, setNewExInputs] = useState<Record<string, string>>({})
   const [showExPicker, setShowExPicker] = useState<string | null>(null)
   const [newOptionalInput, setNewOptionalInput] = useState('')
+  const [allDoneFlash, setAllDoneFlash] = useState(false)
 
   // Exercise library state
   const [showAddEx, setShowAddEx] = useState(false)
@@ -174,6 +175,44 @@ export function Gym() {
   const markAsTraining = async (day: GymPlanDay) => {
     if (!day.id) return
     await db.gymPlan.update(day.id, { rest: false, label: 'Training', sections: [] })
+  }
+
+  // ── Alles erledigt ──────────────────────────────────────────────────────────
+  const todayPlanExercises = !isDayRest(todayDay)
+    ? (todayPlanDay?.sections.flatMap(s => s.exercises) ?? [])
+    : []
+
+  const allExercisesDone =
+    todayPlanExercises.length > 0 &&
+    todayPlanExercises.every(ex =>
+      todaySession?.exercises.find(e => e.name === ex.name)?.status === 'done'
+    )
+
+  const markAllGymDone = async () => {
+    if (!todayPlanDay || isDayRest(todayDay)) return
+    const allEntries: import('../../db/db').WorkoutExercise[] =
+      todayPlanDay.sections.flatMap(section =>
+        section.exercises.map(ex => ({
+          name:   ex.name,
+          sets:   getSets(section.name, ex.name, ex.sets),
+          reps:   getReps(section.name, ex.name, parseReps(ex.reps)),
+          weight: getWeight(section.name, ex.name),
+          status: 'done' as const,
+        }))
+      )
+    const existing = await db.workoutSessions.where('date').equals(today()).first()
+    if (existing) {
+      await db.workoutSessions.update(existing.id!, { exercises: allEntries })
+    } else {
+      await db.workoutSessions.add({
+        date:     today(),
+        dayIndex: todayDayIndex,
+        dayLabel: todayPlanDay.label ?? '',
+        exercises: allEntries,
+      })
+    }
+    setAllDoneFlash(true)
+    setTimeout(() => setAllDoneFlash(false), 1800)
   }
 
   // Exercise library CRUD
@@ -321,6 +360,38 @@ export function Gym() {
                     {planDay && <p className="text-sm text-chrome mt-0.5">{planDay.label}</p>}
                   </div>
                   <div className="flex items-center gap-2">
+                    {/* Alles erledigt — only for today's training day */}
+                    {selectedDay === todayDay && planDay && !isDayRest(selectedDay) && (
+                      allExercisesDone ? (
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: 5,
+                          fontSize: 10, color: '#4ade80', letterSpacing: '0.06em',
+                        }}>
+                          <Check size={11} />
+                          Abgeschlossen
+                        </div>
+                      ) : (
+                        <motion.button
+                          className="all-done-btn"
+                          whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                          onClick={markAllGymDone}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 5,
+                            padding: '6px 12px',
+                            border: '0.5px solid rgba(74,222,128,0.4)',
+                            borderRadius: 8,
+                            background: 'rgba(74,222,128,0.06)',
+                            color: '#4ade80',
+                            fontSize: 10, fontWeight: 500,
+                            letterSpacing: '0.06em',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <CheckCheck size={12} />
+                          Alles erledigt
+                        </motion.button>
+                      )
+                    )}
                     {planDay && (
                       <motion.button onClick={() => toggleRestDay(selectedDay)}
                         whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.97 }} transition={SPRING}
@@ -690,6 +761,31 @@ export function Gym() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* ── "Alles erledigt" toast ── */}
+      <AnimatePresence>
+        {allDoneFlash && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.22 }}
+            style={{
+              position: 'fixed', top: 72, left: '50%', transform: 'translateX(-50%)',
+              background: 'rgba(74,222,128,0.12)',
+              border: '0.5px solid rgba(74,222,128,0.4)',
+              borderRadius: 10, padding: '8px 20px',
+              fontSize: 12, color: '#4ade80', fontWeight: 500,
+              zIndex: 999,
+              display: 'flex', alignItems: 'center', gap: 8,
+              backdropFilter: 'blur(8px)',
+            }}
+          >
+            <Check size={14} />
+            Training abgeschlossen!
+          </motion.div>
+        )}
+      </AnimatePresence>
     </PageTransition>
   )
 }
