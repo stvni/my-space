@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, X, Dumbbell, Trash2, History, Pencil, Check, CheckCheck, BookOpen, ImageOff, Moon, Zap } from 'lucide-react'
@@ -10,6 +10,12 @@ import { PageTransition } from '../../components/layout/PageTransition'
 import { Card, SectionLabel } from '../../components/ui/Card'
 import { GymVerlauf } from '../../components/Timeline/GymVerlauf'
 import { today } from '../../utils/date'
+import {
+  getWorkoutSession, upsertWorkoutSession, getRecentWorkoutSessions,
+  getGymDayOverrides, upsertGymDayOverride, deleteGymDayOverride,
+  type SupaWorkoutSession, type SupaGymDayOverride,
+} from '../../lib/dataService'
+import { useRealtimeSync } from '../../hooks/useRealtimeSync'
 
 const DAYS_ORDER = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 const SPRING = { type: 'spring', stiffness: 400, damping: 25 } as const
@@ -37,7 +43,12 @@ export function Gym() {
   const [newOptionalInput, setNewOptionalInput] = useState('')
   const [allDoneFlash, setAllDoneFlash] = useState(false)
 
-  // Exercise library state
+  // Supabase state
+  const [todaySession, setTodaySession] = useState<SupaWorkoutSession | null>(null)
+  const [weekSessions, setWeekSessions] = useState<SupaWorkoutSession[]>([])
+  const [gymDayOverrides, setGymDayOverrides] = useState<SupaGymDayOverride[]>([])
+
+  // Exercise library state (stays in Dexie)
   const [showAddEx, setShowAddEx] = useState(false)
   const [editingEx, setEditingEx] = useState<Exercise | null>(null)
   const [exForm, setExForm] = useState({ name: '', muscleGroup: MUSCLE_GROUPS[0], description: '' })
@@ -45,35 +56,51 @@ export function Gym() {
   const [libSearch, setLibSearch] = useState('')
   const imageInputRef = useRef<HTMLInputElement>(null)
 
+  // Dexie (static plan data)
   const gymPlan = useLiveQuery(() => db.gymPlan.toArray(), []) ?? []
-  const gymDayOverrides = useLiveQuery(() => db.gymDayOverrides.toArray(), []) ?? []
-  const todaySession = useLiveQuery(() => db.workoutSessions.where('date').equals(today()).first(), [])
-  const weekSessions = useLiveQuery(() => {
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 7)
-    const cutoffStr = cutoff.toISOString().slice(0, 10)
-    return db.workoutSessions.where('date').aboveOrEqual(cutoffStr).toArray()
-  }, []) ?? []
   const allExercises = useLiveQuery(() => db.exercises.orderBy('name').toArray(), []) ?? []
+
+  // Supabase loaders
+  const loadSession = useCallback(async () => {
+    setTodaySession(await getWorkoutSession(today()))
+  }, [])
+
+  const loadWeek = useCallback(async () => {
+    setWeekSessions(await getRecentWorkoutSessions(7))
+  }, [])
+
+  const loadOverrides = useCallback(async () => {
+    setGymDayOverrides(await getGymDayOverrides())
+  }, [])
+
+  const reloadAll = useCallback(async () => {
+    await Promise.all([loadSession(), loadWeek(), loadOverrides()])
+  }, [loadSession, loadWeek, loadOverrides])
+
+  useEffect(() => { reloadAll() }, [reloadAll])
+  useRealtimeSync('workout_sessions', reloadAll)
+  useRealtimeSync('gym_day_overrides', loadOverrides)
 
   const planDay = gymPlan.find(p => p.day === selectedDay)
   const todayPlanDay = gymPlan.find(p => p.day === todayDay)
 
   const isDayRest = (day: string) => {
     const idx = DAYS_ORDER.indexOf(day)
-    const override = gymDayOverrides.find(o => o.dayIndex === idx)
-    if (override) return override.isRest
+    const override = gymDayOverrides.find(o => o.day_index === idx)
+    if (override) return override.is_rest
     return gymPlan.find(p => p.day === day)?.rest ?? false
   }
 
   const toggleRestDay = async (day: string) => {
     const idx = DAYS_ORDER.indexOf(day)
-    const override = gymDayOverrides.find(o => o.dayIndex === idx)
+    const override = gymDayOverrides.find(o => o.day_index === idx)
     if (override) {
-      await db.gymDayOverrides.delete(override.id!)
+      await deleteGymDayOverride(idx)
     } else {
       const planIsRest = gymPlan.find(p => p.day === day)?.rest ?? false
-      await db.gymDayOverrides.add({ dayIndex: idx, isRest: !planIsRest })
+      await upsertGymDayOverride(idx, !planIsRest)
     }
+    await loadOverrides()
   }
 
   const exKey = (section: string, ex: string) => `${section}::${ex}`
@@ -92,30 +119,27 @@ export function Gym() {
 
   const markExercise = async (exerciseName: string, sets: number, reps: number, weight: number, status: 'done' | 'skip') => {
     const entry: WorkoutExercise = { name: exerciseName, sets, reps, weight, status }
-    const existing = await db.workoutSessions.where('date').equals(today()).first()
-    if (existing) {
-      const exs = existing.exercises ?? []
-      const idx = exs.findIndex(e => e.name === exerciseName)
-      let updated: WorkoutExercise[]
-      if (idx >= 0 && exs[idx].status === status) {
-        updated = exs.filter((_, i) => i !== idx)
-      } else if (idx >= 0) {
-        updated = exs.map((e, i) => i === idx ? entry : e)
-      } else {
-        updated = [...exs, entry]
-      }
-      await db.workoutSessions.update(existing.id!, { exercises: updated })
+    const existing = todaySession
+    const exs = existing?.exercises ?? []
+    const idx = exs.findIndex(e => e.name === exerciseName)
+    let updated: WorkoutExercise[]
+    if (idx >= 0 && exs[idx].status === status) {
+      updated = exs.filter((_, i) => i !== idx)
+    } else if (idx >= 0) {
+      updated = exs.map((e, i) => i === idx ? entry : e)
     } else {
-      await db.workoutSessions.add({
-        date: today(),
-        dayIndex: todayDayIndex,
-        dayLabel: todayPlanDay?.label ?? '',
-        exercises: [entry],
-      })
+      updated = [...exs, entry]
     }
+    await upsertWorkoutSession({
+      date:      today(),
+      day_index: todayDayIndex,
+      day_label: todayPlanDay?.label ?? '',
+      exercises: updated,
+    })
+    await loadSession()
   }
 
-  // Plan editing
+  // Plan editing (stays in Dexie)
   const updatePlan = async (day: GymPlanDay, sections: GymPlanSection[]) => {
     if (!day.id) return
     await db.gymPlan.update(day.id, { sections })
@@ -190,7 +214,7 @@ export function Gym() {
 
   const markAllGymDone = async () => {
     if (!todayPlanDay || isDayRest(todayDay)) return
-    const allEntries: import('../../db/db').WorkoutExercise[] =
+    const allEntries: WorkoutExercise[] =
       todayPlanDay.sections.flatMap(section =>
         section.exercises.map(ex => ({
           name:   ex.name,
@@ -200,22 +224,18 @@ export function Gym() {
           status: 'done' as const,
         }))
       )
-    const existing = await db.workoutSessions.where('date').equals(today()).first()
-    if (existing) {
-      await db.workoutSessions.update(existing.id!, { exercises: allEntries })
-    } else {
-      await db.workoutSessions.add({
-        date:     today(),
-        dayIndex: todayDayIndex,
-        dayLabel: todayPlanDay.label ?? '',
-        exercises: allEntries,
-      })
-    }
+    await upsertWorkoutSession({
+      date:      today(),
+      day_index: todayDayIndex,
+      day_label: todayPlanDay.label ?? '',
+      exercises: allEntries,
+    })
+    await loadSession()
     setAllDoneFlash(true)
     setTimeout(() => setAllDoneFlash(false), 1800)
   }
 
-  // Exercise library CRUD
+  // Exercise library CRUD (stays in Dexie)
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -333,7 +353,7 @@ export function Gym() {
                 <div className="flex gap-1">
                   {DAYS_ORDER.map(day => {
                     const isRest = isDayRest(day)
-                    const isOverridden = gymDayOverrides.some(o => o.dayIndex === DAYS_ORDER.indexOf(day))
+                    const isOverridden = gymDayOverrides.some(o => o.day_index === DAYS_ORDER.indexOf(day))
                     return (
                       <motion.button key={day} onClick={() => setSelectedDay(day)}
                         whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.97 }} transition={SPRING}
@@ -397,7 +417,7 @@ export function Gym() {
                         whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.97 }} transition={SPRING}
                         title={isDayRest(selectedDay) ? 'Als Trainingstag markieren' : 'Als Ruhetag markieren'}
                         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs border transition-all ${
-                          gymDayOverrides.some(o => o.dayIndex === DAYS_ORDER.indexOf(selectedDay))
+                          gymDayOverrides.some(o => o.day_index === DAYS_ORDER.indexOf(selectedDay))
                             ? 'border-purple-500/30 text-purple-400 bg-purple-500/10'
                             : 'border-border text-chrome-dim hover:border-chrome/20'
                         }`}>

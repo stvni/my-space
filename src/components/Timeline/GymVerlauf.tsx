@@ -1,10 +1,10 @@
+import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowLeft } from 'lucide-react'
-import { useLiveQuery } from 'dexie-react-hooks'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
 } from 'recharts'
-import { db } from '../../db/db'
+import { getAllWorkoutSessions, type SupaWorkoutSession } from '../../lib/dataService'
 
 interface Props { onBack: () => void }
 
@@ -31,7 +31,15 @@ function formatDate(dateStr: string) {
 }
 
 export function GymVerlauf({ onBack }: Props) {
-  const sessions = useLiveQuery(() => db.workoutSessions.orderBy('date').reverse().toArray(), []) ?? []
+  const [sessions, setSessions] = useState<SupaWorkoutSession[]>([])
+
+  const load = useCallback(async () => {
+    const data = await getAllWorkoutSessions()
+    setSessions([...data].reverse())
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
   const days = getLast30()
   const sessionMap = new Map(sessions.map(s => [s.date, s]))
   const hasAny = sessions.length > 0
@@ -175,9 +183,9 @@ export function GymVerlauf({ onBack }: Props) {
                       borderRadius: 9, padding: '10px 12px' }}>
                     {session ? (
                       <>
-                        {session.dayLabel && (
+                        {session.day_label && (
                           <p style={{ fontSize: 9, color: '#333', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>
-                            {session.dayLabel}
+                            {session.day_label}
                           </p>
                         )}
                         <div style={{ display: 'flex', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>

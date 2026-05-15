@@ -1,20 +1,31 @@
-import { useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, X, Heart, ShoppingBag, Search } from 'lucide-react'
-import { db, type StyleItem } from '../../db/db'
 import { PageTransition } from '../../components/layout/PageTransition'
 import { Card, SectionLabel } from '../../components/ui/Card'
+import {
+  getStyleItems, addStyleItem, updateStyleItem, deleteStyleItem,
+  type SupaStyleItem,
+} from '../../lib/dataService'
+import { useRealtimeSync } from '../../hooks/useRealtimeSync'
 
 const CATEGORIES = ['Tops', 'Bottoms', 'Outerwear', 'Shoes', 'Accessories', 'Bags', 'Other']
 
 export function StyleBoard() {
+  const [items, setItems] = useState<SupaStyleItem[]>([])
   const [view, setView] = useState<'all' | 'owned' | 'wishlist'>('all')
   const [category, setCategory] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ name: '', category: 'Tops', imageUrl: '', tags: '', notes: '', owned: true, wishlist: false })
+  const [form, setForm] = useState({ name: '', category: 'Tops', image_url: '', tags: '', notes: '', owned: true, wishlist: false })
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setItems(await getStyleItems())
+  }, [])
+
+  useEffect(() => { load() }, [load])
+  useRealtimeSync('style_items', load)
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -23,12 +34,10 @@ export function StyleBoard() {
     reader.onloadend = () => {
       const result = reader.result as string
       setPreviewUrl(result)
-      setForm(f => ({ ...f, imageUrl: result }))
+      setForm(f => ({ ...f, image_url: result }))
     }
     reader.readAsDataURL(file)
   }
-
-  const items = useLiveQuery(() => db.styleItems.orderBy('createdAt').reverse().toArray(), []) ?? []
 
   const filtered = items.filter(item => {
     if (view === 'owned' && !item.owned) return false
@@ -38,24 +47,31 @@ export function StyleBoard() {
     return true
   })
 
-  const addItem = async () => {
+  const handleAdd = async () => {
     if (!form.name.trim()) return
-    await db.styleItems.add({
-      ...form,
+    await addStyleItem({
+      name: form.name,
+      category: form.category,
+      image_url: form.image_url || null,
       tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
-      createdAt: Date.now(),
+      notes: form.notes,
+      owned: form.owned,
+      wishlist: form.wishlist,
     })
-    setForm({ name: '', category: 'Tops', imageUrl: '', tags: '', notes: '', owned: true, wishlist: false })
+    setForm({ name: '', category: 'Tops', image_url: '', tags: '', notes: '', owned: true, wishlist: false })
     setPreviewUrl(null)
     setShowForm(false)
+    await load()
   }
 
-  const deleteItem = async (id: number) => {
-    await db.styleItems.delete(id)
+  const handleDelete = async (id: string) => {
+    await deleteStyleItem(id)
+    await load()
   }
 
-  const toggleWishlist = async (item: StyleItem) => {
-    await db.styleItems.update(item.id!, { wishlist: !item.wishlist })
+  const toggleWishlist = async (item: SupaStyleItem) => {
+    await updateStyleItem(item.id, { wishlist: !item.wishlist })
+    await load()
   }
 
   return (
@@ -144,7 +160,7 @@ export function StyleBoard() {
                       Wishlist
                     </label>
                   </div>
-                  <button onClick={addItem} className="w-full py-2 bg-surface2 border border-border rounded-lg text-sm text-chrome hover:border-chrome/30 transition-colors">
+                  <button onClick={handleAdd} className="w-full py-2 bg-surface2 border border-border rounded-lg text-sm text-chrome hover:border-chrome/30 transition-colors">
                     Add to Wardrobe
                   </button>
                 </div>
@@ -185,9 +201,9 @@ export function StyleBoard() {
                 variants={{ hidden: { opacity: 0, scale: 0.95 }, show: { opacity: 1, scale: 1 } }}
               >
                 <Card className="group relative overflow-hidden">
-                  {item.imageUrl ? (
+                  {item.image_url ? (
                     <div className="w-full h-36 mb-3 rounded-lg overflow-hidden bg-surface2">
-                      <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                      <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
                     </div>
                   ) : (
                     <div className="w-full h-36 mb-3 rounded-lg bg-surface2 border border-border flex items-center justify-center">
@@ -204,7 +220,7 @@ export function StyleBoard() {
                       <button onClick={() => toggleWishlist(item)} className={`transition-colors ${item.wishlist ? 'text-pink-400' : 'text-chrome-dim hover:text-pink-400'}`}>
                         <Heart size={13} fill={item.wishlist ? 'currentColor' : 'none'} />
                       </button>
-                      <button onClick={() => deleteItem(item.id!)} className="text-chrome-dim hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">
+                      <button onClick={() => handleDelete(item.id)} className="text-chrome-dim hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">
                         <X size={13} />
                       </button>
                     </div>

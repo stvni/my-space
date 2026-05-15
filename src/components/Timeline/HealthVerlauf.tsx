@@ -1,11 +1,11 @@
+import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowLeft } from 'lucide-react'
-import { useLiveQuery } from 'dexie-react-hooks'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell, CartesianGrid,
 } from 'recharts'
-import { db, type HealthMetric } from '../../db/db'
+import { getAllHealthLogs, getHealthGoals, type SupaHealthLog } from '../../lib/dataService'
 
 interface Props { onBack: () => void }
 
@@ -36,7 +36,7 @@ function formatDate(ds: string) {
   return `${d.getDate()}. ${ ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'][d.getMonth()]}`
 }
 
-function weightTrend(metrics: HealthMetric[], date: string) {
+function weightTrend(metrics: SupaHealthLog[], date: string) {
   const sorted = [...metrics].sort((a, b) => a.date.localeCompare(b.date))
   const idx = sorted.findIndex(m => m.date === date)
   if (idx <= 0) return null
@@ -55,11 +55,22 @@ function StatCell({ label, value }: { label: string; value: string }) {
 }
 
 export function HealthVerlauf({ onBack }: Props) {
-  const allMetrics = useLiveQuery(() => db.healthMetrics.orderBy('date').toArray(), []) ?? []
-  const savedGoals = useLiveQuery(() => db.healthGoals.get(1), [])
-  const weightGoal = savedGoals?.weight ?? 72
-  const sleepGoal  = savedGoals?.sleep  ?? 8
-  const waterGoal  = savedGoals?.water  ?? 3.0
+  const [allMetrics, setAllMetrics] = useState<SupaHealthLog[]>([])
+  const [weightGoal, setWeightGoal] = useState(72)
+  const [sleepGoal,  setSleepGoal]  = useState(8)
+  const [waterGoal,  setWaterGoal]  = useState(3.0)
+
+  const load = useCallback(async () => {
+    const [logs, goals] = await Promise.all([getAllHealthLogs(), getHealthGoals()])
+    setAllMetrics(logs)
+    if (goals) {
+      setWeightGoal(goals.weight)
+      setSleepGoal(goals.sleep)
+      setWaterGoal(goals.water)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
 
   const days = getLast30()
   const metricMap = new Map(allMetrics.map(m => [m.date, m]))
@@ -67,15 +78,15 @@ export function HealthVerlauf({ onBack }: Props) {
 
   const weightData = allMetrics
     .filter(m => (m.weight ?? 0) > 0)
-    .map(m => ({ date: fmt(m.date), weight: m.weight! }))
+    .map(m => ({ date: fmt(m.date), weight: m.weight }))
 
   const recent14 = allMetrics.slice(-14)
-  const sleepData = recent14.filter(m => m.sleep != null).map(m => ({ date: fmt(m.date), sleep: m.sleep! }))
-  const waterData = recent14.filter(m => m.water != null).map(m => ({ date: fmt(m.date), water: m.water! }))
+  const sleepData = recent14.filter(m => m.sleep != null).map(m => ({ date: fmt(m.date), sleep: m.sleep }))
+  const waterData = recent14.filter(m => m.water != null).map(m => ({ date: fmt(m.date), water: m.water }))
 
   const first = weightData[0]?.weight
   const last  = weightData[weightData.length - 1]?.weight
-  const trend = weightData.length > 1 ? (last - first) : null
+  const trend = weightData.length > 1 && first != null && last != null ? (last - first) : null
 
   return (
     <div>

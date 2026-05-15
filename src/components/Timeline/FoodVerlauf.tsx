@@ -1,11 +1,11 @@
+import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowLeft } from 'lucide-react'
-import { useLiveQuery } from 'dexie-react-hooks'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, ReferenceLine, CartesianGrid,
 } from 'recharts'
-import { db } from '../../db/db'
+import { getAllMeals, getHealthGoals, type SupaMeal } from '../../lib/dataService'
 
 interface Props { onBack: () => void }
 
@@ -47,13 +47,24 @@ function StatCell({ label, value }: { label: string; value: string }) {
 }
 
 export function FoodVerlauf({ onBack }: Props) {
-  const allMeals   = useLiveQuery(() => db.meals.orderBy('date').toArray(), []) ?? []
-  const savedGoals = useLiveQuery(() => db.healthGoals.get(1), [])
-  const calorieGoal = savedGoals?.calories ?? 2600
-  const proteinGoal = savedGoals?.protein  ?? 150
+  const [allMeals, setAllMeals]     = useState<SupaMeal[]>([])
+  const [calorieGoal, setCalorieGoal] = useState(2600)
+  const [proteinGoal, setProteinGoal] = useState(150)
+
+  const load = useCallback(async () => {
+    const [meals, goals] = await Promise.all([getAllMeals(), getHealthGoals()])
+    setAllMeals(meals)
+    if (goals) {
+      setCalorieGoal(goals.calories)
+      setProteinGoal(goals.protein)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
   const days = getLast30()
 
-  const mealsByDate = new Map<string, typeof allMeals>()
+  const mealsByDate = new Map<string, SupaMeal[]>()
   allMeals.forEach(m => {
     const arr = mealsByDate.get(m.date) ?? []
     arr.push(m)

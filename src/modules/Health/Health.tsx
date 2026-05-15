@@ -1,73 +1,67 @@
-import { useState, useEffect } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { db, type HealthGoals } from '../../db/db'
 import { PageTransition } from '../../components/layout/PageTransition'
 import { Card, SectionLabel } from '../../components/ui/Card'
 import { HealthVerlauf } from '../../components/Timeline/HealthVerlauf'
 import { today } from '../../utils/date'
+import {
+  getHealthLog, upsertHealthLog, getHealthGoals, upsertHealthGoals,
+} from '../../lib/dataService'
+import { useRealtimeSync } from '../../hooks/useRealtimeSync'
 
 const SPRING = { type: 'spring', stiffness: 400, damping: 25 } as const
 
-const DEFAULT_GOALS: Omit<HealthGoals, 'id'> = {
+const DEFAULT_GOALS = {
   calories: 2600, protein: 150, carbs: 330, fat: 75,
   water: 3.0, weight: 72, steps: 10000, sleep: 8,
 }
+
+type GoalKeys = keyof typeof DEFAULT_GOALS
 
 export function Health() {
   const [tab, setTab] = useState<'heute' | 'verlauf' | 'ziele'>('heute')
   const [metrics, setMetrics] = useState({ weight: 0, sleep: 0, water: 0, mood: 5, steps: 0 })
   const [goals, setGoals] = useState(DEFAULT_GOALS)
 
-  const todayMetrics = useLiveQuery(() => db.healthMetrics.where('date').equals(today()).first(), [])
-  const profile = useLiveQuery(() => db.profile.toArray().then(arr => arr[0]), [])
-  const savedGoals = useLiveQuery(() => db.healthGoals.get(1), [])
-
-  useEffect(() => {
-    if (todayMetrics) {
+  const loadData = useCallback(async () => {
+    const [log, savedGoals] = await Promise.all([
+      getHealthLog(today()),
+      getHealthGoals(),
+    ])
+    if (log) {
       setMetrics({
-        weight: todayMetrics.weight ?? (profile?.weight ?? 0),
-        sleep: todayMetrics.sleep ?? 0,
-        water: todayMetrics.water ?? 0,
-        mood: todayMetrics.mood ?? 5,
-        steps: todayMetrics.steps ?? 0,
+        weight: log.weight ?? 0,
+        sleep:  log.sleep  ?? 0,
+        water:  log.water  ?? 0,
+        mood:   log.mood   ?? 5,
+        steps:  log.steps  ?? 0,
       })
-    } else if (profile && metrics.weight === 0) {
-      setMetrics(prev => ({ ...prev, weight: profile.weight }))
     }
-  }, [todayMetrics, profile])
+    if (savedGoals) {
+      setGoals({
+        calories: savedGoals.calories,
+        protein:  savedGoals.protein  ?? DEFAULT_GOALS.protein,
+        carbs:    savedGoals.carbs    ?? DEFAULT_GOALS.carbs,
+        fat:      savedGoals.fat      ?? DEFAULT_GOALS.fat,
+        water:    savedGoals.water,
+        weight:   savedGoals.weight,
+        steps:    savedGoals.steps,
+        sleep:    savedGoals.sleep,
+      })
+    }
+  }, [])
 
-  useEffect(() => {
-    if (savedGoals) setGoals({
-      calories: savedGoals.calories,
-      protein:  savedGoals.protein  ?? DEFAULT_GOALS.protein,
-      carbs:    savedGoals.carbs    ?? DEFAULT_GOALS.carbs,
-      fat:      savedGoals.fat      ?? DEFAULT_GOALS.fat,
-      water:    savedGoals.water,
-      weight:   savedGoals.weight,
-      steps:    savedGoals.steps,
-      sleep:    savedGoals.sleep,
-    })
-  }, [savedGoals])
+  useEffect(() => { loadData() }, [loadData])
+  useRealtimeSync('health_logs', loadData)
 
   const saveMetrics = async () => {
-    const existing = await db.healthMetrics.where('date').equals(today()).first()
-    if (existing) {
-      await db.healthMetrics.update(existing.id!, { ...metrics, date: today() })
-    } else {
-      await db.healthMetrics.add({ ...metrics, date: today() })
-    }
+    await upsertHealthLog({ date: today(), ...metrics })
   }
 
-  const updateGoal = async (key: keyof typeof goals, delta: number) => {
-    const next = { ...goals, [key]: Math.max(0, goals[key] + delta) }
+  const updateGoal = async (key: GoalKeys, delta: number) => {
+    const next = { ...goals, [key]: Math.max(0, +(goals[key] + delta).toFixed(2)) }
     setGoals(next)
-    const existing = await db.healthGoals.get(1)
-    if (existing) {
-      await db.healthGoals.update(1, next)
-    } else {
-      await db.healthGoals.put({ id: 1, ...next })
-    }
+    await upsertHealthGoals(next)
   }
 
   const METRICS_CONFIG = [
@@ -77,7 +71,7 @@ export function Health() {
     { key: 'steps',  label: 'Steps',  unit: 'steps', max: goals.steps,                color: '#22c55e', step: 100 },
   ]
 
-  const GOALS_CONFIG: { key: keyof typeof goals; label: string; unit: string; step: number; hint: string }[] = [
+  const GOALS_CONFIG: { key: GoalKeys; label: string; unit: string; step: number; hint: string }[] = [
     { key: 'calories', label: 'Kalorienziel',  unit: 'kcal', step: 50,   hint: 'Lean Bulk — Überschuss' },
     { key: 'protein',  label: 'Protein',        unit: 'g',    step: 5,    hint: '2.2g × Körpergewicht' },
     { key: 'carbs',    label: 'Kohlenhydrate',  unit: 'g',    step: 5,    hint: 'Energie für Training' },
@@ -96,9 +90,6 @@ export function Health() {
             <SectionLabel>Health</SectionLabel>
             <div className="flex items-center gap-3 mt-1">
               <h1 className="chrome-text text-2xl font-semibold">Daily Metrics</h1>
-              {profile && (
-                <span className="text-xs text-chrome-dim font-mono">{profile.height} cm · {profile.weight} kg</span>
-              )}
             </div>
           </div>
           <div className="flex bg-surface2 rounded-lg border border-border p-1 gap-1">
@@ -208,22 +199,22 @@ export function Health() {
                       <div style={{ fontSize: 9, color: '#333', marginTop: 2, letterSpacing: '0.1em' }}>{g.hint}</div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <motion.button
-                          whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.94 }} transition={SPRING}
-                          onClick={() => updateGoal(g.key, -g.step)}
-                          style={{ width: 28, height: 28, border: '0.5px solid #252525', borderRadius: 6,
-                            background: 'transparent', color: '#555', fontSize: 16, cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</motion.button>
-                        <span style={{ fontSize: 13, fontWeight: 500, color: '#c8c8c8', minWidth: 80, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
-                          {+goals[g.key].toFixed(2)} {g.unit}
-                        </span>
-                        <motion.button
-                          whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.94 }} transition={SPRING}
-                          onClick={() => updateGoal(g.key, g.step)}
-                          style={{ width: 28, height: 28, border: '0.5px solid #252525', borderRadius: 6,
-                            background: 'transparent', color: '#666', fontSize: 18, cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</motion.button>
-                      </div>
+                      <motion.button
+                        whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.94 }} transition={SPRING}
+                        onClick={() => updateGoal(g.key, -g.step)}
+                        style={{ width: 28, height: 28, border: '0.5px solid #252525', borderRadius: 6,
+                          background: 'transparent', color: '#555', fontSize: 16, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</motion.button>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: '#c8c8c8', minWidth: 80, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
+                        {+goals[g.key].toFixed(2)} {g.unit}
+                      </span>
+                      <motion.button
+                        whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.94 }} transition={SPRING}
+                        onClick={() => updateGoal(g.key, g.step)}
+                        style={{ width: 28, height: 28, border: '0.5px solid #252525', borderRadius: 6,
+                          background: 'transparent', color: '#666', fontSize: 18, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</motion.button>
+                    </div>
                   </div>
                 ))}
               </div>

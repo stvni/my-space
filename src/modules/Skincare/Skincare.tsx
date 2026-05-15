@@ -1,16 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check } from 'lucide-react'
-import { useLiveQuery } from 'dexie-react-hooks'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
 } from 'recharts'
-import { db } from '../../db/db'
 import { toSwissDate } from '../../utils/dateFormat'
 import { PageTransition } from '../../components/layout/PageTransition'
 import { Card, SectionLabel } from '../../components/ui/Card'
 import { RingWidget } from '../../components/ui/RingWidget'
 import { today } from '../../utils/date'
+import {
+  getAllSkincareLogs, upsertSkincareLog, type SupaSkincareLog,
+} from '../../lib/dataService'
+import { useRealtimeSync } from '../../hooks/useRealtimeSync'
 
 export const SKINCARE_ROUTINE = {
   morning: {
@@ -69,10 +71,14 @@ export function Skincare() {
   const [routine, setRoutine] = useState<'am' | 'pm'>('am')
   const [doneAM, setDoneAM] = useState<Set<number>>(() => loadDone('am'))
   const [donePM, setDonePM] = useState<Set<number>>(() => loadDone('pm'))
+  const [skincareLogs, setSkincareLogs] = useState<SupaSkincareLog[]>([])
 
-  const skincareLogs = useLiveQuery(() =>
-    db.skincareDayLogs.orderBy('date').toArray(), []
-  ) ?? []
+  const loadLogs = useCallback(async () => {
+    setSkincareLogs(await getAllSkincareLogs())
+  }, [])
+
+  useEffect(() => { loadLogs() }, [loadLogs])
+  useRealtimeSync('skincare_logs', loadLogs)
 
   const todayKey = DAY_MAP[new Date().getDay()]
   const amSteps = SKINCARE_ROUTINE.morning[todayKey]
@@ -83,20 +89,14 @@ export function Skincare() {
   const setDone = routine === 'am' ? setDoneAM : setDonePM
 
   const saveToDB = async (amDone: Set<number>, pmDone: Set<number>) => {
-    const dateStr = today()
-    const existing = await db.skincareDayLogs.where('date').equals(dateStr).first()
-    const record = {
-      date: dateStr,
-      morningDone: amDone.size,
-      morningTotal: amSteps.length,
-      eveningDone: pmDone.size,
-      eveningTotal: pmSteps.length,
-    }
-    if (existing) {
-      await db.skincareDayLogs.update(existing.id!, record)
-    } else {
-      await db.skincareDayLogs.add(record)
-    }
+    await upsertSkincareLog({
+      date:          today(),
+      morning_done:  amDone.size,
+      morning_total: amSteps.length,
+      evening_done:  pmDone.size,
+      evening_total: pmSteps.length,
+    })
+    await loadLogs()
   }
 
   const toggleStep = async (i: number) => {
@@ -130,9 +130,9 @@ export function Skincare() {
 
   // Verlauf chart data
   const chartData = skincareLogs.slice(-21).map(l => ({
-    date: formatShort(l.date),
-    morningPct: l.morningTotal > 0 ? Math.round((l.morningDone / l.morningTotal) * 100) : 0,
-    eveningPct: l.eveningTotal > 0 ? Math.round((l.eveningDone / l.eveningTotal) * 100) : 0,
+    date:       formatShort(l.date),
+    morningPct: l.morning_total > 0 ? Math.round((l.morning_done / l.morning_total) * 100) : 0,
+    eveningPct: l.evening_total > 0 ? Math.round((l.evening_done / l.evening_total) * 100) : 0,
   }))
 
   return (
@@ -362,8 +362,8 @@ export function Skincare() {
                   {/* History list */}
                   <div className="space-y-2">
                     {[...skincareLogs].reverse().map(l => {
-                      const amPct = l.morningTotal > 0 ? Math.round(l.morningDone / l.morningTotal * 100) : 0
-                      const pmPct = l.eveningTotal > 0 ? Math.round(l.eveningDone / l.eveningTotal * 100) : 0
+                      const amPct = l.morning_total > 0 ? Math.round(l.morning_done / l.morning_total * 100) : 0
+                      const pmPct = l.evening_total > 0 ? Math.round(l.evening_done / l.evening_total * 100) : 0
                       return (
                         <div key={l.id} style={{ background: '#0a0a0a', border: '0.5px solid #1a1a1a', borderRadius: 9, padding: '10px 14px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

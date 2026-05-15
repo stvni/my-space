@@ -1,39 +1,43 @@
-import { useState, useEffect, useRef } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, X, Play, Pause, RotateCcw, Check, Flag } from 'lucide-react'
-import { db, type ZHAWTask } from '../../db/db'
 import { PageTransition } from '../../components/layout/PageTransition'
 import { Card, SectionLabel } from '../../components/ui/Card'
 import { RingWidget } from '../../components/ui/RingWidget'
+import {
+  getZhawTasks, addZhawTask, toggleZhawTask, deleteZhawTask,
+  type SupaZhawTask,
+} from '../../lib/dataService'
+import { useRealtimeSync } from '../../hooks/useRealtimeSync'
 
-const PRIORITIES = ['low', 'medium', 'high'] as const
+const PRIORITIES  = ['low', 'medium', 'high'] as const
 const FOCUS_PRESETS = [30, 60, 90]
 const SPRING = { type: 'spring', stiffness: 400, damping: 25 } as const
 
 export function ZHAWHub() {
-  const [tab, setTab] = useState<'tasks' | 'pomodoro'>('tasks')
+  const [tab, setTab]         = useState<'tasks' | 'pomodoro'>('tasks')
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ title: '', module: '', dueDate: '', priority: 'medium' as ZHAWTask['priority'], notes: '' })
-  const [filter, setFilter] = useState<'all' | 'open' | 'done'>('open')
+  const [form, setForm] = useState({ title: '', module: '', due_date: '', priority: 'medium' as string, notes: '' })
+  const [filter, setFilter]   = useState<'all' | 'open' | 'done'>('open')
+  const [tasks, setTasks]     = useState<SupaZhawTask[]>([])
 
   // Focus timer
-  const [pomPreset, setPomPreset] = useState<number>(30)
-  const [pomTotal, setPomTotal] = useState(30 * 60)
+  const [pomPreset, setPomPreset]   = useState(30)
+  const [pomTotal, setPomTotal]     = useState(30 * 60)
   const [pomSeconds, setPomSeconds] = useState(30 * 60)
   const [pomRunning, setPomRunning] = useState(false)
-  const [pomTask, setPomTask] = useState('')
-  const [pomRound, setPomRound] = useState(0)
-  const [inputTime, setInputTime] = useState('30:00')
+  const [pomTask, setPomTask]       = useState('')
+  const [pomRound, setPomRound]     = useState(0)
+  const [inputTime, setInputTime]   = useState('30:00')
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const tasks = useLiveQuery(async () => {
-    let result
-    if (filter === 'all') result = await db.zhawTasks.orderBy('dueDate').toArray()
-    else if (filter === 'done') result = await db.zhawTasks.where('done').equals(1).toArray()
-    else result = await db.zhawTasks.where('done').equals(0).toArray()
-    return result.sort((a, b) => a.dueDate.localeCompare(b.dueDate))
-  }, [filter]) ?? []
+  const load = useCallback(async () => {
+    const data = await getZhawTasks(filter)
+    setTasks(data)
+  }, [filter])
+
+  useEffect(() => { load() }, [load])
+  useRealtimeSync('zhaw_tasks', load)
 
   useEffect(() => {
     if (pomRunning) {
@@ -44,7 +48,7 @@ export function ZHAWHub() {
             setPomRunning(false)
             setPomRound(r => r + 1)
             if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-              new Notification('Fokus fertig!', { body: `Session abgeschlossen.`, icon: '/pwa-192x192.png' })
+              new Notification('Fokus fertig!', { body: 'Session abgeschlossen.', icon: '/pwa-192x192.png' })
             }
             return pomTotal
           }
@@ -58,49 +62,27 @@ export function ZHAWHub() {
   }, [pomRunning, pomTotal])
 
   const selectPreset = (min: number) => {
-    setPomPreset(min)
-    setPomTotal(min * 60)
-    setPomSeconds(min * 60)
-    setPomRunning(false)
-    setInputTime(`${String(min).padStart(2, '0')}:00`)
+    setPomPreset(min); setPomTotal(min * 60); setPomSeconds(min * 60)
+    setPomRunning(false); setInputTime(`${String(min).padStart(2,'0')}:00`)
   }
-
   const applyInputTime = () => {
     const parts = inputTime.split(':')
-    let totalSecs = 0
-    if (parts.length === 2) {
-      const m = parseInt(parts[0]) || 0
-      const s = parseInt(parts[1]) || 0
-      totalSecs = m * 60 + s
-    } else {
-      totalSecs = (parseInt(parts[0]) || 0) * 60
-    }
+    let totalSecs = parts.length === 2 ? (parseInt(parts[0])||0)*60 + (parseInt(parts[1])||0) : (parseInt(parts[0])||0)*60
     if (totalSecs < 60) return
-    totalSecs = Math.min(180 * 60, totalSecs)
-    setPomPreset(0)
-    setPomTotal(totalSecs)
-    setPomSeconds(totalSecs)
+    totalSecs = Math.min(180*60, totalSecs)
+    setPomPreset(0); setPomTotal(totalSecs); setPomSeconds(totalSecs)
   }
 
-  const addTask = async () => {
+  const handleAdd = async () => {
     if (!form.title.trim()) return
-    await db.zhawTasks.add({ ...form, done: false, createdAt: Date.now() })
-    setForm({ title: '', module: '', dueDate: '', priority: 'medium', notes: '' })
+    await addZhawTask({ title: form.title, module: form.module, due_date: form.due_date, priority: form.priority, notes: form.notes, done: false })
+    setForm({ title: '', module: '', due_date: '', priority: 'medium', notes: '' })
     setShowForm(false)
   }
 
-  const toggleTask = async (t: ZHAWTask) => {
-    await db.zhawTasks.update(t.id!, { done: !t.done })
-  }
-
-  const deleteTask = async (id: number) => {
-    await db.zhawTasks.delete(id)
-  }
-
-  const resetPom = () => {
-    setPomRunning(false)
-    setPomSeconds(pomTotal)
-  }
+  const handleToggle = async (t: SupaZhawTask) => { await toggleZhawTask(t.id, !t.done) }
+  const handleDelete = async (id: string) => { await deleteZhawTask(id) }
+  const resetPom = () => { setPomRunning(false); setPomSeconds(pomTotal) }
 
   const mins = Math.floor(pomSeconds / 60)
   const secs = pomSeconds % 60
@@ -154,7 +136,7 @@ export function ZHAWHub() {
                         <input value={form.module} onChange={e => setForm(f => ({ ...f, module: e.target.value }))} placeholder="Module (e.g. PROG2)" className="bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-chrome outline-none focus:border-chrome/30" />
                         <div>
                           <label className="block text-xs text-chrome-dim mb-1 tracking-widest uppercase" style={{ fontSize: 9 }}>Deadline</label>
-                          <input value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} type="date" className="w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-chrome-dim outline-none focus:border-chrome/30" />
+                          <input value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} type="date" className="w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-chrome-dim outline-none focus:border-chrome/30" />
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -167,7 +149,7 @@ export function ZHAWHub() {
                         ))}
                       </div>
                       <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Notes…" rows={2} className="w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-chrome resize-none outline-none focus:border-chrome/30" />
-                      <motion.button onClick={addTask}
+                      <motion.button onClick={handleAdd}
                         whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.97 }} transition={SPRING}
                         className="w-full py-2 bg-surface2 border border-border rounded-lg text-sm text-chrome hover:border-chrome/30 transition-colors">
                         Add Task
@@ -180,16 +162,11 @@ export function ZHAWHub() {
               <div className="space-y-2">
                 {tasks.length === 0 ? (
                   <Card><p className="text-chrome-dim text-sm text-center py-4">No tasks here.</p></Card>
-                ) : tasks.map((t: typeof tasks[0], i: number) => (
-                  <motion.div
-                    key={t.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.04 }}
-                  >
+                ) : tasks.map((t, i) => (
+                  <motion.div key={t.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
                     <Card className="group">
                       <div className="flex items-start gap-3">
-                        <button onClick={() => toggleTask(t)} className="mt-0.5 shrink-0">
+                        <button onClick={() => handleToggle(t)} className="mt-0.5 shrink-0">
                           <motion.div whileTap={{ scale: 0.8 }}
                             className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${t.done ? 'bg-chrome/20 border-chrome/40' : 'border-border hover:border-chrome/40'}`}>
                             {t.done && (
@@ -203,11 +180,11 @@ export function ZHAWHub() {
                           <p className={`text-sm font-medium ${t.done ? 'text-chrome-dim line-through' : 'text-chrome'}`}>{t.title}</p>
                           <div className="flex items-center gap-2 mt-0.5">
                             {t.module && <span className="text-xs text-chrome-dim font-mono">{t.module}</span>}
-                            {t.dueDate && <span className={`text-xs font-mono ${urgencyColor(t.dueDate)}`}>{daysUntil(t.dueDate)}</span>}
+                            {t.due_date && <span className={`text-xs font-mono ${urgencyColor(t.due_date)}`}>{daysUntil(t.due_date)}</span>}
                             <span className={`text-xs px-1.5 py-0.5 rounded border ${priorityBadge(t.priority)}`}>{t.priority}</span>
                           </div>
                         </div>
-                        <button onClick={() => deleteTask(t.id!)} className="opacity-0 group-hover:opacity-100 text-chrome-dim hover:text-red-400 transition-all mt-0.5">
+                        <button onClick={() => handleDelete(t.id)} className="opacity-0 group-hover:opacity-100 text-chrome-dim hover:text-red-400 transition-all mt-0.5">
                           <X size={12} />
                         </button>
                       </div>
@@ -217,86 +194,48 @@ export function ZHAWHub() {
               </div>
             </motion.div>
           ) : (
-            <motion.div key="pomodoro" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="flex flex-col items-center gap-4">
+            <motion.div key="pomodoro" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-4">
               <Card className="w-full max-w-sm">
-                {/* Task input */}
                 <input value={pomTask} onChange={e => setPomTask(e.target.value)}
                   placeholder="What are you working on?"
                   className="w-full bg-transparent border-b border-border pb-2 text-sm text-chrome outline-none focus:border-chrome/40 transition-colors mb-5" />
-
-                {/* Preset buttons */}
                 <div className="flex gap-2 justify-center mb-3">
                   {FOCUS_PRESETS.map(min => (
-                    <motion.button key={min}
-                      whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.97 }} transition={SPRING}
+                    <motion.button key={min} whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.97 }} transition={SPRING}
                       onClick={() => selectPreset(min)}
-                      style={{
-                        padding: '5px 14px',
-                        border: `0.5px solid ${pomPreset === min ? '#888' : '#252525'}`,
-                        borderRadius: 7, background: 'transparent',
-                        color: pomPreset === min ? '#c8c8c8' : '#555',
-                        fontSize: 10, fontWeight: 500, cursor: 'pointer',
-                        letterSpacing: '0.08em',
-                      }}>
+                      style={{ padding: '5px 14px', border: `0.5px solid ${pomPreset===min?'#888':'#252525'}`, borderRadius: 7, background: 'transparent', color: pomPreset===min?'#c8c8c8':'#555', fontSize: 10, fontWeight: 500, cursor: 'pointer', letterSpacing: '0.08em' }}>
                       {min} min
                     </motion.button>
                   ))}
                 </div>
-
-                {/* Ring with editable center */}
                 <div className="flex justify-center mb-5">
-                  <RingWidget
-                    value={1 - pomPct}
-                    max={1}
-                    size={180}
-                    strokeWidth={10}
-                    color={pomRunning ? '#22c55e' : '#3b82f6'}
-                    smooth
-                  >
+                  <RingWidget value={1-pomPct} max={1} size={180} strokeWidth={10} color={pomRunning?'#22c55e':'#3b82f6'} smooth>
                     <div style={{ textAlign: 'center' }}>
                       {pomRunning ? (
                         <span style={{ fontSize: 22, color: '#e0e0e0', fontWeight: 600, fontFamily: 'monospace', letterSpacing: '0.04em' }}>
-                          {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
+                          {String(mins).padStart(2,'0')}:{String(secs).padStart(2,'0')}
                         </span>
                       ) : (
-                        <input
-                          value={inputTime}
-                          onChange={e => setInputTime(e.target.value)}
-                          onBlur={applyInputTime}
-                          onKeyDown={e => e.key === 'Enter' && applyInputTime()}
-                          style={{
-                            width: 80, textAlign: 'center', background: 'transparent',
-                            border: 'none', outline: 'none', fontSize: 22, fontWeight: 600,
-                            color: '#e0e0e0', fontFamily: 'monospace', letterSpacing: '0.04em',
-                          }}
-                        />
+                        <input value={inputTime} onChange={e => setInputTime(e.target.value)} onBlur={applyInputTime} onKeyDown={e => e.key==='Enter'&&applyInputTime()}
+                          style={{ width: 80, textAlign: 'center', background: 'transparent', border: 'none', outline: 'none', fontSize: 22, fontWeight: 600, color: '#e0e0e0', fontFamily: 'monospace', letterSpacing: '0.04em' }} />
                       )}
                       <div style={{ fontSize: 10, color: '#555', marginTop: 4 }}>{pomTask || 'Fokus'}</div>
                     </div>
                   </RingWidget>
                 </div>
-
-                {/* Controls */}
                 <div className="flex gap-3 justify-center">
-                  <motion.button onClick={resetPom}
-                    whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.97 }} transition={SPRING}
+                  <motion.button onClick={resetPom} whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.97 }} transition={SPRING}
                     className="w-10 h-10 rounded-full border border-border text-chrome-dim hover:text-chrome flex items-center justify-center transition-colors">
                     <RotateCcw size={14} />
                   </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.97 }} transition={SPRING}
+                  <motion.button whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.97 }} transition={SPRING}
                     onClick={() => setPomRunning(r => !r)}
-                    className="w-14 h-14 rounded-full border border-chrome/30 text-chrome-bright hover:bg-surface2 flex items-center justify-center transition-colors"
-                  >
+                    className="w-14 h-14 rounded-full border border-chrome/30 text-chrome-bright hover:bg-surface2 flex items-center justify-center transition-colors">
                     {pomRunning ? <Pause size={20} /> : <Play size={20} className="ml-1" />}
                   </motion.button>
-                  <div className="w-10 h-10 rounded-full border border-border text-chrome-dim flex items-center justify-center text-xs font-mono">
-                    {pomRound}
-                  </div>
+                  <div className="w-10 h-10 rounded-full border border-border text-chrome-dim flex items-center justify-center text-xs font-mono">{pomRound}</div>
                 </div>
               </Card>
-
               <div className="flex gap-2">
                 <Flag size={12} className="text-chrome-dim mt-0.5" />
                 <span className="text-chrome-dim text-xs">{pomRound} sessions completed today</span>
@@ -315,7 +254,6 @@ function daysUntil(date: string) {
   if (d === 0) return 'due today'
   return `${d}d left`
 }
-
 function urgencyColor(date: string) {
   const d = Math.ceil((new Date(date).getTime() - Date.now()) / 86400000)
   if (d < 0) return 'text-red-400'
@@ -323,13 +261,11 @@ function urgencyColor(date: string) {
   if (d <= 7) return 'text-yellow-400/80'
   return 'text-chrome-dim'
 }
-
 function priorityBadge(p: string) {
   if (p === 'high') return 'border-red-500/30 text-red-400/80'
   if (p === 'medium') return 'border-orange-500/30 text-orange-400/80'
   return 'border-border text-chrome-dim'
 }
-
 function priorityActive(p: string) {
   if (p === 'high') return 'border-red-500/50 text-red-400 bg-red-500/10'
   if (p === 'medium') return 'border-orange-500/50 text-orange-400 bg-orange-500/10'

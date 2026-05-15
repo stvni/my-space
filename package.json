@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@remotion/player": "^4.0.459",
+    "@supabase/supabase-js": "^2.105.4",
     "@types/react-datepicker": "^6.2.0",
     "@types/three": "^0.184.1",
     "clsx": "^2.1.1",

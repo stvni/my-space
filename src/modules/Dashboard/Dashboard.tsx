@@ -1,3 +1,4 @@
+import { useState, useEffect, useCallback } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
@@ -10,6 +11,13 @@ import { CheckSquare, Apple, Droplets, Dumbbell } from 'lucide-react'
 import { format } from '../../utils/date'
 import { toSwissDate } from '../../utils/dateFormat'
 import { useCountUp } from '../../hooks/useCountUp'
+import {
+  getFoodMeals, getHealthLog, getZhawTasks, getUpcomingEvents,
+  getWorkoutSession, getGymDayOverrides, getSkincareLog, getHealthGoals,
+  type SupaMeal, type SupaHealthLog, type SupaZhawTask,
+  type SupaEvent, type SupaWorkoutSession, type SupaGymDayOverride, type SupaSkincareLog,
+} from '../../lib/dataService'
+import { useRealtimeSync } from '../../hooks/useRealtimeSync'
 
 const stagger = { show: { transition: { staggerChildren: 0.07 } } }
 
@@ -17,34 +25,72 @@ export function Dashboard() {
   const navigate = useNavigate()
   const today = format(new Date())
 
-  const todos          = useLiveQuery(() => db.todos.where('done').equals(0).toArray(), []) ?? []
-  const todayMeals     = useLiveQuery(() => db.meals.where('date').equals(today).toArray(), [today]) ?? []
-  const todayHealth    = useLiveQuery(() => db.healthMetrics.where('date').equals(today).first(), [today])
-  const zhawTasks      = useLiveQuery(() => db.zhawTasks.where('done').equals(0).toArray(), []) ?? []
-  const upcomingEvents = useLiveQuery(() => db.calendarEvents.where('date').aboveOrEqual(today).limit(5).toArray(), [today]) ?? []
-  const todaySession   = useLiveQuery(() => db.workoutSessions.where('date').equals(today).first(), [today])
-  const gymPlanData    = useLiveQuery(() => db.gymPlan.toArray(), []) ?? []
-  const gymDayOverrides = useLiveQuery(() => db.gymDayOverrides.toArray(), []) ?? []
-  const todaySkincare  = useLiveQuery(() => db.skincareDayLogs.where('date').equals(today).first(), [today])
-  const healthGoals    = useLiveQuery(() => db.healthGoals.get(1), [])
-  const profile        = useLiveQuery(() => db.profile.toArray().then(a => a[0]), [])
+  // ── Dexie (local-only, no sync needed) ──
+  const todos       = useLiveQuery(() => db.todos.where('done').equals(0).toArray(), []) ?? []
+  const gymPlanData = useLiveQuery(() => db.gymPlan.toArray(), []) ?? []
+  const profile     = useLiveQuery(() => db.profile.toArray().then(a => a[0]), [])
 
-  const totalCalories  = todayMeals.reduce((s, m) => s + m.calories, 0)
-  const totalProtein   = todayMeals.reduce((s, m) => s + m.protein, 0)
-  const calGoal        = healthGoals?.calories  ?? 2600
-  const proteinGoal    = healthGoals?.protein   ?? 150
-  const waterGoal      = healthGoals?.water     ?? 3.0
-  const sleepGoal      = healthGoals?.sleep     ?? 8
-  const water          = todayHealth?.water     ?? 0
-  const sleep          = todayHealth?.sleep     ?? 0
-  const weight         = todayHealth?.weight    ?? profile?.weight ?? 0
+  // ── Supabase state ──
+  const [todayMeals,     setTodayMeals]     = useState<SupaMeal[]>([])
+  const [todayHealth,    setTodayHealth]     = useState<SupaHealthLog | null>(null)
+  const [zhawTasks,      setZhawTasks]       = useState<SupaZhawTask[]>([])
+  const [upcomingEvents, setUpcomingEvents]  = useState<SupaEvent[]>([])
+  const [todaySession,   setTodaySession]    = useState<SupaWorkoutSession | null>(null)
+  const [gymDayOverrides,setGymDayOverrides] = useState<SupaGymDayOverride[]>([])
+  const [todaySkincare,  setTodaySkincare]   = useState<SupaSkincareLog | null>(null)
+  const [calGoal,        setCalGoal]         = useState(2600)
+  const [proteinGoal,    setProteinGoal]     = useState(150)
+  const [waterGoal,      setWaterGoal]       = useState(3.0)
+  const [sleepGoal,      setSleepGoal]       = useState(8)
+
+  const loadAll = useCallback(async () => {
+    const [meals, health, tasks, events, session, overrides, skincare, goals] = await Promise.all([
+      getFoodMeals(today),
+      getHealthLog(today),
+      getZhawTasks('open'),
+      getUpcomingEvents(today, 5),
+      getWorkoutSession(today),
+      getGymDayOverrides(),
+      getSkincareLog(today),
+      getHealthGoals(),
+    ])
+    setTodayMeals(meals)
+    setTodayHealth(health)
+    setZhawTasks(tasks)
+    setUpcomingEvents(events)
+    setTodaySession(session)
+    setGymDayOverrides(overrides)
+    setTodaySkincare(skincare)
+    if (goals) {
+      setCalGoal(goals.calories)
+      setProteinGoal(goals.protein)
+      setWaterGoal(goals.water)
+      setSleepGoal(goals.sleep)
+    }
+  }, [today])
+
+  useEffect(() => { loadAll() }, [loadAll])
+  useRealtimeSync('food_meals',       loadAll)
+  useRealtimeSync('health_logs',      loadAll)
+  useRealtimeSync('zhaw_tasks',       loadAll)
+  useRealtimeSync('calendar_events',  loadAll)
+  useRealtimeSync('workout_sessions', loadAll)
+  useRealtimeSync('gym_day_overrides',loadAll)
+  useRealtimeSync('skincare_logs',    loadAll)
+
+  // ── Derived values ──
+  const totalCalories = todayMeals.reduce((s, m) => s + m.calories, 0)
+  const totalProtein  = todayMeals.reduce((s, m) => s + m.protein, 0)
+  const water         = todayHealth?.water  ?? 0
+  const sleep         = todayHealth?.sleep  ?? 0
+  const weight        = todayHealth?.weight ?? profile?.weight ?? 0
 
   // Gym
   const todayDay      = getTodayDay()
   const todayPlanDay  = gymPlanData.find(p => p.day === todayDay)
   const todayDayIndex = getTodayPlanIndex()
-  const restOverride  = gymDayOverrides.find(o => o.dayIndex === todayDayIndex)
-  const isRestToday   = restOverride ? restOverride.isRest : (todayPlanDay?.rest ?? false)
+  const restOverride  = gymDayOverrides.find(o => o.day_index === todayDayIndex)
+  const isRestToday   = restOverride ? restOverride.is_rest : (todayPlanDay?.rest ?? false)
   const totalExercises = !isRestToday && todayPlanDay
     ? todayPlanDay.sections.flatMap(s => s.exercises).length : 0
   const gymDone  = todaySession?.exercises.filter(e => e.status === 'done').length ?? 0
@@ -62,8 +108,8 @@ export function Dashboard() {
     protein: totalProtein, proteinGoal,
     water, waterGoal, sleep, sleepGoal,
     zhawDone: 0, zhawTotal: zhawTasks.length,
-    skincareDone: todaySkincare?.morningDone ?? 0,
-    skincareTotal: todaySkincare?.morningTotal ?? 4,
+    skincareDone:  todaySkincare?.morning_done  ?? 0,
+    skincareTotal: todaySkincare?.morning_total ?? 4,
     weight,
   }
 
@@ -107,7 +153,7 @@ export function Dashboard() {
           </Card>
           <Card delay={0.14} className="flex flex-col items-center gap-2 py-5 cursor-pointer" onClick={() => navigate('/zhaw')}>
             <RingWidget value={zhawTasks.filter(t => {
-              const diff = (new Date(t.dueDate).getTime() - Date.now()) / 86400000
+              const diff = (new Date(t.due_date).getTime() - Date.now()) / 86400000
               return diff <= 7
             }).length} max={Math.max(zhawTasks.length, 1)} size={96} strokeWidth={7} color="#8b5cf6"
               label={`${animatedTasks}`} sublabel="tasks" />
@@ -154,7 +200,7 @@ export function Dashboard() {
                   {zhawTasks.slice(0, 4).map(t => (
                     <li key={t.id} className="flex items-center justify-between text-xs">
                       <span className="text-chrome line-clamp-1 flex-1">{t.title}</span>
-                      <span className={`ml-2 font-mono shrink-0 ${urgencyColor(t.dueDate)}`}>{daysUntil(t.dueDate)}</span>
+                      <span className={`ml-2 font-mono shrink-0 ${urgencyColor(t.due_date)}`}>{daysUntil(t.due_date)}</span>
                     </li>
                   ))}
                 </ul>
